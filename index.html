@@ -18,7 +18,7 @@
 <body>
 
   <!-- ==================== LOGIN MODAL / SCREEN ==================== -->
-  <div id="login-screen" class="login-overlay">
+  <div id="login-screen" class="login-overlay" style="display:none;">
     <div class="login-card">
       <div class="login-header">
         <div class="login-logo">
@@ -48,7 +48,7 @@
   </div>
 
   <!-- ==================== MAIN APP CONTAINER ==================== -->
-  <div id="app-container" class="app-container" style="display:none;">
+  <div id="app-container" class="app-container" style="display:block;">
     
     <!-- Top Navigation Bar -->
     <header class="topbar">
@@ -58,7 +58,7 @@
         </div>
         <div>
           <h2>ระบบข้อมูลแหล่งแม่น้ำกก อ.แม่อาย</h2>
-          <span class="subtitle">แหล่งน้ำ 147 บ่อ | ผลแล็บคุณภาพน้ำกรมอนามัย | คัดกรอง Env-As-01 (283 ราย) & Env-As-02</span>
+          <span class="subtitle">แหล่งน้ำ 147 บ่อ | ผลแล็บคุณภาพน้ำกรมอนามัย | คัดกรอง Env-As-01 (การตอบกลับ 243 / เก็บปัสสาวะ 90 ราย), Env-As-02 & 2Q</span>
         </div>
       </div>
 
@@ -70,7 +70,7 @@
           <i class="fa-solid fa-earth-asia"></i> แผนที่พิกัด & ภูมิอากาศ
         </button>
         <button class="nav-tab" data-tab="tab-screening" onclick="switchTab('tab-screening')">
-          <i class="fa-solid fa-clipboard-check"></i> ระบบบันทึกการคัดกรอง (2 แบบฟอร์ม)
+          <i class="fa-solid fa-clipboard-check"></i> ระบบบันทึกการคัดกรอง (Env-As & 2Q)
         </button>
         <button class="nav-tab" data-tab="tab-wells" onclick="switchTab('tab-wells')">
           <i class="fa-solid fa-faucet-drip"></i> แหล่งน้ำ (<span id="nav-well-count">147</span>)
@@ -79,7 +79,7 @@
           <i class="fa-solid fa-flask-vial"></i> ผลตรวจแล็บน้ำ (<span id="nav-lab-count">10</span>)
         </button>
         <button class="nav-tab" data-tab="tab-respondents" onclick="switchTab('tab-respondents')">
-          <i class="fa-solid fa-users"></i> ทะเบียน Env-As-01 (<span id="nav-resp-count">283</span>)
+          <i class="fa-solid fa-users"></i> ทะเบียน Env-As-01 (<span id="nav-resp-count">243</span>)
         </button>
         <button class="nav-tab" data-tab="tab-knowledge" onclick="switchTab('tab-knowledge')">
           <i class="fa-solid fa-book-medical"></i> ความรู้ / คู่มือแนวทาง
@@ -135,43 +135,43 @@
       <div class="kpi-card kpi-total" onclick="switchTab('tab-screening')">
         <div class="kpi-icon"><i class="fa-solid fa-people-group"></i></div>
         <div class="kpi-content">
-          <span class="kpi-label">คัดกรอง Env-As-01 / Env-As-02</span>
-          <strong class="kpi-value" id="kpi-total-resp">130</strong>
-          <small class="kpi-sub" id="kpi-tambon-sub">ท่าตอน 112 / แม่นาวาง 18</small>
+          <span class="kpi-label">การตอบกลับ / เก็บปัสสาวะ</span>
+          <strong class="kpi-value" id="kpi-total-resp">243 / 90</strong>
+          <small class="kpi-sub" id="kpi-tambon-sub">การตอบกลับ 243 | เก็บปัสสาวะ 90 ราย</small>
         </div>
       </div>
       <div class="kpi-card kpi-high" onclick="filterByRiskFromKpi('ปานกลาง-มาก')">
         <div class="kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
         <div class="kpi-content">
-          <span class="kpi-label">กลุ่มเสี่ยงปานกลาง - สูง</span>
-          <strong class="kpi-value" id="kpi-risk-alert">0</strong>
-          <small class="kpi-sub" id="kpi-risk-sub">ต่ำ 0 | ปานกลาง 0 | สูง 0</small>
+          <span class="kpi-label">กลุ่มเสี่ยงปานกลาง - มาก</span>
+          <strong class="kpi-value" id="kpi-risk-alert">45</strong>
+          <small class="kpi-sub" id="kpi-risk-sub">ต่ำ 198 | ปานกลาง 41 | มาก 4</small>
         </div>
       </div>
     </section>
 
-    <!-- ==================== TAB 0: EXECUTIVE DASHBOARD (147 WELLS + 283 RESPONDENTS) ==================== -->
+    <!-- ==================== TAB 0: EXECUTIVE DASHBOARD (147 WELLS + 243 RESPONSE / 90 URINE + 2Q) ==================== -->
     <main id="tab-dashboard" class="tab-content active">
       <div class="dashboard-wrapper">
         <div class="dash-banner">
           <div>
-            <h2><i class="fa-solid fa-chart-line"></i> ระบบข้อมูลแหล่งแม่น้ำกก อ.แม่อาย : แดชบอร์ดแหล่งน้ำ 147 บ่อ & ผลคัดกรองสารหนู (283 ราย)</h2>
-            <p>รวบรวมข้อมูลสำรวจแหล่งน้ำ 147 จุด และผลการคัดกรอง Env-As-01 ครบทั้ง <b>แท็บการตอบกลับ (283 ราย)</b> และ <b>แท็บรายชื่อเก็บปัสสาวะ (130 ราย)</b> พร้อม Env-As-02</p>
+            <h2><i class="fa-solid fa-chart-line"></i> ระบบข้อมูลแหล่งแม่น้ำกก อ.แม่อาย : แดชบอร์ดแหล่งน้ำ 147 บ่อ & ผลคัดกรองสารหนู (รวมรายชื่อซ้ำ)</h2>
+            <p>แสดงผลแยกชัดเจนระหว่าง <b>แท็บที่ 1: การตอบกลับ (243 ราย)</b> และ <b>แท็บที่ 2: รายชื่อเก็บปัสสาวะ (90 ราย)</b> พร้อมจำแนกรายตำบล ราย รพ.สต. รายหมู่บ้าน และแดชบอร์ดคัดกรอง 2Q</p>
           </div>
           <div class="header-actions">
             <button class="btn btn-primary" onclick="switchTab('tab-map')">
               <i class="fa-solid fa-map-location-dot"></i> เปิดแผนที่ดาวเทียม/ภูมิอากาศ
             </button>
             <button class="btn btn-success" onclick="switchTab('tab-screening')">
-              <i class="fa-solid fa-clipboard-check"></i> บันทึกแบบคัดกรอง (Env-As-01 / 02)
+              <i class="fa-solid fa-clipboard-check"></i> บันทึกคัดกรอง (Env-As-01 / 02)
             </button>
-            <button class="btn btn-outline" onclick="switchTab('tab-import')">
-              <i class="fa-solid fa-file-import"></i> นำเข้าข้อมูลจำนวนมาก & Google Sheets
+            <button class="btn btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="open2QModal()">
+              <i class="fa-solid fa-brain"></i> + คัดกรองสุขภาพจิต 2Q
             </button>
           </div>
         </div>
 
-        <!-- Row 1: 3 Visual Analytics Cards -->
+        <!-- Row 1: 3 Visual Analytics Cards (Water Wells) -->
         <div class="dash-grid-3">
           <!-- Card 1: By Well Type -->
           <div class="dash-card">
@@ -201,15 +201,202 @@
           </div>
         </div>
 
-        <!-- Row 2: Breakdown by Village (Moo) & Target Group Risk Matrix -->
+        <!-- Row 2: SEPARATED DISPLAY FOR TAB 1 (การตอบกลับ 243 ราย) VS TAB 2 (รายชื่อเก็บปัสสาวะ 90 ราย) -->
         <div class="dash-grid-2">
-          <!-- Left: Table of Wells by Tambon & Moo -->
+          <!-- Left Card: แท็บที่ 1 การตอบกลับ (243 ราย) -->
+          <div class="dash-card" style="border-top: 4px solid #0284c7;">
+            <div class="dash-card-header" style="flex-wrap:wrap; gap:8px;">
+              <div>
+                <h3 style="color:#0369a1;"><i class="fa-solid fa-users-viewfinder"></i> แท็บที่ 1: ผลประเมินความเสี่ยง "การตอบกลับ" (<span id="dash-tab1-total">243</span> ราย)</h3>
+                <small style="color:#64748b;">ข้อมูลผู้รับการคัดกรองทั้งหมดหลังรวมรายชื่อซ้ำ (คัดกรองทั่วไป 153 ราย + เข้าเกณฑ์เก็บปัสสาวะ 90 ราย)</small>
+              </div>
+              <button class="btn btn-sm btn-outline" onclick="filterRespondentsByTab('ALL')">ดูรายชื่อทั้ง 243 ราย &rarr;</button>
+            </div>
+            <div id="chart-resp-tab1-risk" class="bar-chart-container" style="margin-bottom:14px;"></div>
+
+            <h4 style="font-size:13px; color:#0369a1; margin-bottom:6px;">
+              <i class="fa-solid fa-table-cells"></i> สรุประดับความเสี่ยง แท็บ "การตอบกลับ" (243 ราย) แยกตามตำบล
+            </h4>
+            <table class="pivot-table" style="max-width:100%; margin-bottom:10px;">
+              <thead>
+                <tr>
+                  <th>ระดับความเสี่ยง (แท็บการตอบกลับ)</th>
+                  <th>เกณฑ์คะแนน</th>
+                  <th class="text-center">ต.ท่าตอน</th>
+                  <th class="text-center">ต.แม่นาวาง</th>
+                  <th class="text-center">รวม (ราย)</th>
+                  <th>มาตรการดำเนินการ</th>
+                </tr>
+              </thead>
+              <tbody id="dash-risk-matrix-tab1-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Right Card: แท็บที่ 2 รายชื่อเก็บปัสสาวะ (90 ราย) -->
+          <div class="dash-card" style="border-top: 4px solid #0d9488;">
+            <div class="dash-card-header" style="flex-wrap:wrap; gap:8px;">
+              <div>
+                <h3 style="color:#0f766e;"><i class="fa-solid fa-vial-circle-check"></i> แท็บที่ 2: ผลประเมินความเสี่ยง "รายชื่อเก็บปัสสาวะ" (<span id="dash-tab2-total">90</span> ราย)</h3>
+                <small style="color:#64748b;">กลุ่มเป้าหมายส่งตรวจปัสสาวะ (กลุ่มใหม่ 80 ราย [NM001-080] + ผู้ประกอบอาชีพ 10 ราย [OCM001-010])</small>
+              </div>
+              <button class="btn btn-sm btn-outline" onclick="filterRespondentsByTab('TARGET_90')">ดูรายชื่อเก็บปัสสาวะ 90 ราย &rarr;</button>
+            </div>
+            <div id="chart-resp-tab2-risk" class="bar-chart-container" style="margin-bottom:14px;"></div>
+
+            <h4 style="font-size:13px; color:#0f766e; margin-bottom:6px;">
+              <i class="fa-solid fa-layer-group"></i> สรุปกลุ่มเป้าหมาย & เกณฑ์คัดเลือก แท็บ "รายชื่อเก็บปัสสาวะ" (90 ราย)
+            </h4>
+            <table class="pivot-table" style="max-width:100%; margin-bottom:10px;">
+              <thead>
+                <tr>
+                  <th>กลุ่มเป้าหมาย / เกณฑ์คัดเลือก (หมายเหตุ)</th>
+                  <th class="text-center">ต.ท่าตอน</th>
+                  <th class="text-center">ต.แม่นาวาง</th>
+                  <th class="text-center">รวม (ราย)</th>
+                </tr>
+              </thead>
+              <tbody id="dash-pivot-tab2-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Row 3: BREAKDOWN OF ENV-AS-01 BY TAMBON, BY HEALTH CENTER (รพ.สต.), AND BY VILLAGE (หมู่บ้าน) -->
+        <div class="dash-card" style="margin-bottom:18px; border-top: 4px solid #2563eb;">
+          <div class="dash-card-header" style="flex-wrap:wrap; gap:10px;">
+            <div>
+              <h3 style="font-size:16px; color:#1e3a8a;"><i class="fa-solid fa-sitemap"></i> ข้อมูลผู้สัมผัสสารหนู (Env-As-01) แยกรายตำบล, ราย รพ.สต. และรายหมู่บ้าน (เปรียบเทียบแท็บการตอบกลับ vs แท็บเก็บปัสสาวะ)</h3>
+              <small style="color:#64748b;">คลิกเลือกชุดข้อมูลมุมขวาบน หรือดูตารางเปรียบเทียบทั้งแท็บการตอบกลับ (243 ราย) และแท็บรายชื่อเก็บปัสสาวะ (90 ราย) แยกตามพื้นที่</small>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <label style="font-size:12.5px; font-weight:600; color:#1e3a8a;">เลือกแท็บข้อมูลที่แสดง:</label>
+              <select id="dash-resp-tab-filter" onchange="renderDashboard()" style="padding:6px 10px; border-radius:8px; border:1px solid #93c5fd; font-size:13px; font-weight:600; background:#eff6ff; color:#1d4ed8;">
+                <option value="ALL">แท็บที่ 1: การตอบกลับทั้งหมด (243 ราย)</option>
+                <option value="TARGET_90">แท็บที่ 2: รายชื่อเก็บปัสสาวะ (90 ราย)</option>
+                <option value="GENERAL_153">เฉพาะคัดกรองทั่วไปที่ไม่ได้เก็บปัสสาวะ (153 ราย)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="dash-grid-2" style="margin-bottom:14px;">
+            <!-- Breakdown 1: รายตำบล (By Tambon) -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+              <h4 style="font-size:13.5px; color:#0f172a; margin-bottom:8px;">
+                <i class="fa-solid fa-map-pin" style="color:#2563eb;"></i> 1. แยกตามรายตำบล (ต.ท่าตอน และ ต.แม่นาวาง)
+              </h4>
+              <div class="table-responsive">
+                <table class="data-table compact-table">
+                  <thead>
+                    <tr>
+                      <th>ตำบล</th>
+                      <th class="text-center">เสี่ยงต่ำ</th>
+                      <th class="text-center">เสี่ยงปานกลาง</th>
+                      <th class="text-center">เสี่ยงมาก</th>
+                      <th class="text-center" style="background:#e0f2fe; color:#0369a1;">รวมแท็บการตอบกลับ</th>
+                      <th class="text-center" style="background:#ccfbf1; color:#0f766e;">ในแท็บเก็บปัสสาวะ (90)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-resp-by-tambon-body"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Breakdown 2: ราย รพ.สต. (By Health Center) -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+              <h4 style="font-size:13.5px; color:#0f172a; margin-bottom:8px;">
+                <i class="fa-solid fa-hospital-user" style="color:#0d9488;"></i> 2. แยกตามราย รพ.สต. ที่รับผิดชอบ
+              </h4>
+              <div class="table-responsive">
+                <table class="data-table compact-table">
+                  <thead>
+                    <tr>
+                      <th>รพ.สต. ที่รับผิดชอบ</th>
+                      <th>ตำบล</th>
+                      <th class="text-center">เสี่ยงต่ำ</th>
+                      <th class="text-center">เสี่ยงปานกลาง</th>
+                      <th class="text-center">เสี่ยงมาก</th>
+                      <th class="text-center" style="background:#e0f2fe; color:#0369a1;">รวมการตอบกลับ</th>
+                      <th class="text-center" style="background:#ccfbf1; color:#0f766e;">เก็บปัสสาวะ (90)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-resp-by-hc-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Breakdown 3: รายหมู่บ้าน (By Moo / Village) -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+              <h4 style="font-size:13.5px; color:#0f172a; margin:0;">
+                <i class="fa-solid fa-house-chimney-user" style="color:#d97706;"></i> 3. แยกตามรายหมู่บ้าน (ตำบล / หมู่ที่ / รพ.สต.) เปรียบเทียบแท็บการตอบกลับ (243 ราย) และแท็บเก็บปัสสาวะ (90 ราย)
+              </h4>
+              <span style="font-size:12px; color:#64748b;">คลิกที่แถวหมู่บ้านเพื่อดูรายชื่อผู้รับการคัดกรองในหมู่บ้านนั้น</span>
+            </div>
+            <div class="table-responsive" style="max-height:360px;">
+              <table class="data-table compact-table">
+                <thead>
+                  <tr>
+                    <th>ตำบล</th>
+                    <th>หมู่ที่</th>
+                    <th>รพ.สต. ที่รับผิดชอบ</th>
+                    <th class="text-center" style="background:#f0fdf4;">การตอบกลับ: เสี่ยงต่ำ</th>
+                    <th class="text-center" style="background:#fffbeb;">การตอบกลับ: ปานกลาง</th>
+                    <th class="text-center" style="background:#fef2f2;">การตอบกลับ: เสี่ยงมาก</th>
+                    <th class="text-center" style="background:#e0f2fe; color:#0369a1;">รวมแท็บการตอบกลับ (243)</th>
+                    <th class="text-center" style="background:#f0fdfa;">เก็บปัสสาวะ: ต่ำ</th>
+                    <th class="text-center" style="background:#fefce8;">เก็บปัสสาวะ: ปานกลาง</th>
+                    <th class="text-center" style="background:#fef2f2;">เก็บปัสสาวะ: มาก</th>
+                    <th class="text-center" style="background:#ccfbf1; color:#0f766e;">รวมแท็บเก็บปัสสาวะ (90)</th>
+                    <th class="text-center">ระยะสัมผัสเฉลี่ย (ปี)</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-resp-by-moo-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 4: 2Q MENTAL HEALTH SCREENING DASHBOARD & WATER WELLS BY MOO -->
+        <div class="dash-grid-2">
+          <!-- Left: 2Q Mental Health Screening Dashboard -->
+          <div class="dash-card" style="border-top: 4px solid #7c3aed;">
+            <div class="dash-card-header" style="flex-wrap:wrap; gap:8px;">
+              <div>
+                <h3 style="color:#6d28d9;"><i class="fa-solid fa-brain"></i> แดชบอร์ดการคัดกรองสุขภาพจิต 2Q (โรคซึมเศร้า 2 คำถาม)</h3>
+                <small style="color:#64748b;">เฝ้าระวังสุขภาพจิตประชาชนในพื้นที่เสี่ยงสารหนู (ตอบ "ใช่" อย่างน้อย 1 ข้อ = มีความเสี่ยง ส่งต่อประเมิน 9Q)</small>
+              </div>
+              <button class="btn btn-sm btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="open2QModal()">
+                <i class="fa-solid fa-plus"></i> + บันทึกคัดกรอง 2Q
+              </button>
+            </div>
+            <div id="chart-2q-overview" class="bar-chart-container" style="margin-bottom:12px;"></div>
+            <h4 style="font-size:13px; color:#6d28d9; margin-bottom:6px;">
+              <i class="fa-solid fa-table-list"></i> สรุปผลการคัดกรอง 2Q แยกตามตำบลและ รพ.สต.
+            </h4>
+            <div class="table-responsive">
+              <table class="data-table compact-table">
+                <thead>
+                  <tr>
+                    <th>รพ.สต. / พื้นที่</th>
+                    <th class="text-center">เป้าหมายทั้งหมด</th>
+                    <th class="text-center">คัดกรอง 2Q แล้ว</th>
+                    <th class="text-center" style="color:#15803d;">ปกติ (2Q-)</th>
+                    <th class="text-center" style="color:#b91c1c;">เสี่ยงซึมเศร้า (2Q+)</th>
+                    <th class="text-center">รอคัดกรอง</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-2q-hc-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right: Table of Wells by Tambon & Moo -->
           <div class="dash-card">
             <div class="dash-card-header">
-              <h3><i class="fa-solid fa-table-list"></i> สรุปจำนวนแหล่งน้ำแยกตามตำบล หมู่บ้าน และประเภทบ่อ</h3>
+              <h3><i class="fa-solid fa-table-list"></i> สรุปจำนวนแหล่งน้ำแยกตามตำบล หมู่บ้าน และประเภทบ่อ (147 บ่อ)</h3>
               <button class="btn btn-sm btn-outline" onclick="exportWellsCsv()"><i class="fa-solid fa-file-csv"></i> ดาวน์โหลด CSV 147 บ่อ</button>
             </div>
-            <div class="table-responsive" style="max-height: 410px;">
+            <div class="table-responsive" style="max-height: 360px;">
               <table class="data-table compact-table">
                 <thead>
                   <tr>
@@ -226,54 +413,6 @@
                 <tbody id="dash-moo-breakdown-body"></tbody>
               </table>
             </div>
-          </div>
-
-          <!-- Right: Respondents Risk & Target Group Summary -->
-          <div class="dash-card">
-            <div class="dash-card-header" style="flex-wrap:wrap; gap:8px;">
-              <h3><i class="fa-solid fa-user-shield"></i> สรุปผลประเมินความเสี่ยงการสัมผัสสารหนู (Env-As-01)</h3>
-              <div style="display:flex; gap:6px; align-items:center;">
-                <select id="dash-resp-tab-filter" onchange="renderDashboard()" style="padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:12.5px; font-weight:600; background:#f0f9ff; color:#0369a1;">
-                  <option value="ALL">แสดงทั้งหมดจากแท็บ "การตอบกลับ" (283 ราย)</option>
-                  <option value="TARGET_130">เฉพาะแท็บ "รายชื่อเก็บปัสสาวะ" (130 ราย)</option>
-                  <option value="GENERAL_153">เฉพาะกลุ่มคัดกรองทั่วไปในแท็บ "การตอบกลับ" (153 ราย)</option>
-                </select>
-                <button class="btn btn-sm btn-outline" onclick="switchTab('tab-respondents')">ดูรายชื่อทั้งหมด &rarr;</button>
-              </div>
-            </div>
-            <div id="chart-resp-risk" class="bar-chart-container" style="margin-bottom:14px;"></div>
-
-            <h4 style="font-size:13.5px; color:#0f766e; margin-bottom:8px;">
-              <i class="fa-solid fa-table-cells"></i> ตารางสรุประดับความเสี่ยงและมาตรการ (ตามเกณฑ์ Env-As-01)
-            </h4>
-            <table class="pivot-table" style="max-width:100%; margin-bottom:12px;">
-              <thead>
-                <tr>
-                  <th>ระดับความเสี่ยง</th>
-                  <th>เกณฑ์คะแนน</th>
-                  <th>ต.ท่าตอน</th>
-                  <th>ต.แม่นาวาง</th>
-                  <th>รวม (ราย)</th>
-                  <th>มาตรการดำเนินการ</th>
-                </tr>
-              </thead>
-              <tbody id="dash-risk-matrix-body"></tbody>
-            </table>
-
-            <h4 style="font-size:13.5px; color:#0f766e; margin-bottom:8px;">
-              <i class="fa-solid fa-layer-group"></i> ตารางสรุปกลุ่มเป้าหมายแยกตามตำบล (แท็บการตอบกลับ + เก็บปัสสาวะ)
-            </h4>
-            <table class="pivot-table" style="max-width:100%;">
-              <thead>
-                <tr>
-                  <th>กลุ่มเป้าหมาย / แท็บข้อมูล</th>
-                  <th>ต.ท่าตอน</th>
-                  <th>ต.แม่นาวาง</th>
-                  <th>รวมทั้งหมด (Grand Total)</th>
-                </tr>
-              </thead>
-              <tbody id="dash-pivot-body"></tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -406,73 +545,85 @@
       </div>
     </main>
 
-    <!-- ==================== TAB 2: SCREENING SYSTEM (ENV-AS-01 & ENV-AS-02 + DASHBOARD) ==================== -->
+    <!-- ==================== TAB 2: SCREENING SYSTEM (ENV-AS-01, ENV-AS-02 & 2Q + DASHBOARD) ==================== -->
     <main id="tab-screening" class="tab-content">
       <div class="dashboard-wrapper">
         <!-- Screening Sub-header & Form Selector -->
         <div class="dash-banner" style="background: linear-gradient(90deg, #f0fdf4 0%, #e0f2fe 100%); border-color:#bae6fd;">
           <div>
-            <h2><i class="fa-solid fa-clipboard-check"></i> ระบบบันทึกการคัดกรองและซักประวัติการสัมผัสสารหนู (กองโรคจากการประกอบอาชีพและสิ่งแวดล้อม)</h2>
-            <p>รองรับการบันทึก แก้ไข ลบ และแสดงแดชบอร์ดทั้ง <b>แบบฟอร์ม Env-As-01 (คัดกรองและประเมินความเสี่ยง ระดับบุคคล)</b> และ <b>แบบฟอร์ม Env-As-02 (ซักประวัติก่อนเก็บตัวอย่างชีวภาพ)</b></p>
+            <h2><i class="fa-solid fa-clipboard-check"></i> ระบบบันทึกการคัดกรองและซักประวัติการสัมผัสสารหนู & คัดกรองสุขภาพจิต 2Q</h2>
+            <p>รองรับการบันทึก แก้ไข ลบ และแสดงแดชบอร์ดแยกชัดเจนระหว่าง <b>แท็บการตอบกลับ (243 ราย)</b>, <b>แท็บรายชื่อเก็บปัสสาวะ (90 ราย)</b>, <b>แบบฟอร์ม Env-As-02</b> และ <b>แบบคัดกรองสุขภาพจิต 2Q</b></p>
           </div>
           <div class="header-actions">
             <button class="btn btn-primary" onclick="openRespondentModal()">
-              <i class="fa-solid fa-file-medical"></i> + บันทึกแบบฟอร์ม Env-As-01 (ประเมินความเสี่ยง)
+              <i class="fa-solid fa-file-medical"></i> + บันทึกแบบ Env-As-01 (ประเมินความเสี่ยง)
             </button>
             <button class="btn btn-success" onclick="openEnvAs02Modal()">
-              <i class="fa-solid fa-vial-circle-check"></i> + บันทึกแบบฟอร์ม Env-As-02 (ซักประวัติก่อนเก็บตัวอย่าง)
+              <i class="fa-solid fa-vial-circle-check"></i> + บันทึกแบบ Env-As-02 (ซักประวัติก่อนเก็บตัวอย่าง)
+            </button>
+            <button class="btn btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="open2QModal()">
+              <i class="fa-solid fa-brain"></i> + คัดกรองสุขภาพจิต 2Q
             </button>
           </div>
         </div>
 
-        <!-- Screening Dashboard (Both Env-As-01 & Env-As-02 Analytics) -->
+        <!-- Screening Dashboard (Env-As-01 Tab 1 vs Tab 2, Env-As-02, and 2Q Analytics) -->
         <div class="dash-grid-3">
-          <!-- Env-As-01 Risk Score Breakdown -->
+          <!-- Card 1: Env-As-01 (Tab 1 vs Tab 2) -->
           <div class="dash-card">
             <div class="dash-card-header">
-              <h3><i class="fa-solid fa-Clipboard-user"></i> แดชบอร์ดแบบฟอร์ม Env-As-01 (<span id="scr-as01-count">130</span> ราย)</h3>
-              <span class="badge-pill">ระดับความเสี่ยง & มาตรการ</span>
+              <h3><i class="fa-solid fa-clipboard-user"></i> แดชบอร์ด Env-As-01 (<span id="scr-as01-count">243</span> ราย)</h3>
+              <span class="badge-pill">การตอบกลับ 243 / เก็บปัสสาวะ 90</span>
             </div>
             <div id="scr-chart-as01-risk" class="bar-chart-container"></div>
             <div style="margin-top:10px; padding:8px 10px; background:#f8fafc; border-radius:8px; font-size:12px;">
-              <div>🔴 <b>กลุ่มเสี่ยงมาก (≥20) & ปานกลาง (10-&lt;20):</b> ตรวจร่างกายโดยแพทย์ และตรวจสารหนูในปัสสาวะ</div>
-              <div style="margin-top:4px;">🟢 <b>กลุ่มเสี่ยงต่ำ (0-&lt;10):</b> สื่อสารความเสี่ยง ให้สุขศึกษา ประเมินซ้ำทุก 1 ปี</div>
+              <div>📊 <b>แท็บการตอบกลับ (243 ราย):</b> เสี่ยงต่ำ 198 | ปานกลาง 41 | มาก 4</div>
+              <div style="margin-top:4px;">🧪 <b>แท็บเก็บปัสสาวะ (90 ราย):</b> เสี่ยงต่ำ 71 | ปานกลาง 18 | มาก 1</div>
             </div>
           </div>
 
-          <!-- Env-As-01 Top Risk Factors (11 Items) -->
+          <!-- Card 2: Env-As-01 Top Risk Factors (11 Items) & Env-As-02 -->
           <div class="dash-card">
             <div class="dash-card-header">
-              <h3><i class="fa-solid fa-list-check"></i> พฤติกรรมเสี่ยงสูงสุดจากแบบ Env-As-01</h3>
-              <span class="badge-pill">ส่วนที่ 4 (11 ข้อคำถาม)</span>
+              <h3><i class="fa-solid fa-list-check"></i> พฤติกรรมเสี่ยงสูงสุด & Env-As-02 (<span id="scr-as02-count">90</span> ราย)</h3>
+              <span class="badge-pill">ส่วนที่ 4 (11 ข้อ) & ชีวภาพ</span>
             </div>
             <div id="scr-chart-as01-questions" class="bar-chart-container"></div>
+            <div id="scr-chart-as02-summary" class="bar-chart-container" style="margin-top:10px; border-top:1px dashed #e2e8f0; padding-top:8px;"></div>
           </div>
 
-          <!-- Env-As-02 Bio-Monitoring Pre-Test Analytics -->
-          <div class="dash-card">
+          <!-- Card 3: 2Q Mental Health Screening Analytics -->
+          <div class="dash-card" style="border-top: 3px solid #7c3aed;">
             <div class="dash-card-header">
-              <h3><i class="fa-solid fa-flask"></i> แดชบอร์ดแบบฟอร์ม Env-As-02 (<span id="scr-as02-count">0</span> ราย)</h3>
-              <span class="badge-pill">ก่อนเก็บตัวอย่างชีวภาพ</span>
+              <h3 style="color:#6d28d9;"><i class="fa-solid fa-brain"></i> แดชบอร์ดคัดกรองสุขภาพจิต 2Q</h3>
+              <button class="btn btn-sm btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="open2QModal()">+ คัดกรอง 2Q</button>
             </div>
-            <div id="scr-chart-as02-summary" class="bar-chart-container"></div>
+            <div id="scr-chart-2q-summary" class="bar-chart-container"></div>
+            <div style="margin-top:10px; padding:8px 10px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; font-size:12px; color:#4c1d95;">
+              <div><b>ข้อ 1:</b> ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ รู้สึกหดหู่ เศร้า หรือท้อแท้สิ้นหวัง</div>
+              <div style="margin-top:3px;"><b>ข้อ 2:</b> ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ รู้สึกเบื่อ ทำอะไรก็ไม่เพลิดเพลิน</div>
+              <div style="margin-top:4px; color:#b91c1c;"><b>เกณฑ์:</b> ตอบ "ใช่" ≥ 1 ข้อ = มีความเสี่ยงภาวะซึมเศร้า (ส่งต่อประเมิน 9Q)</div>
+            </div>
           </div>
         </div>
 
-        <!-- Sub-tabs to toggle between Env-As-01 Table and Env-As-02 Table -->
+        <!-- Sub-tabs to toggle between Env-As-01 Table, Env-As-02 Table, and 2Q Table -->
         <div class="content-card" style="margin:0;">
           <div class="card-header-bar">
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
               <button class="btn btn-primary" id="btn-subtab-as01" onclick="switchScreeningSubTab('as01')">
-                <i class="fa-solid fa-file-Waveform"></i> ทะเบียนแบบฟอร์ม Env-As-01 (คัดกรองระดับบุคคล)
+                <i class="fa-solid fa-file-waveform"></i> 1. ทะเบียนแบบฟอร์ม Env-As-01 (243 / 90 ราย)
               </button>
               <button class="btn btn-outline" id="btn-subtab-as02" onclick="switchScreeningSubTab('as02')">
-                <i class="fa-solid fa-vial"></i> ทะเบียนแบบฟอร์ม Env-As-02 (ซักประวัติก่อนเก็บตัวอย่างชีวภาพ)
+                <i class="fa-solid fa-vial"></i> 2. ทะเบียนแบบฟอร์ม Env-As-02 (ซักประวัติก่อนเก็บตัวอย่าง)
+              </button>
+              <button class="btn btn-outline" id="btn-subtab-2q" onclick="switchScreeningSubTab('2q')">
+                <i class="fa-solid fa-brain"></i> 3. ทะเบียนคัดกรองสุขภาพจิต 2Q
               </button>
             </div>
             <div class="header-actions">
               <button class="btn btn-outline btn-sm" onclick="exportRespondentsCsv()">
-                <i class="fa-solid fa-download"></i> ส่งออก CSV (Env-As-01)
+                <i class="fa-solid fa-download"></i> ส่งออก CSV (Env-As-01 & 2Q)
               </button>
               <button class="btn btn-outline btn-sm" onclick="exportEnvAs02Csv()">
                 <i class="fa-solid fa-download"></i> ส่งออก CSV (Env-As-02)
@@ -485,17 +636,17 @@
             <div class="filter-toolbar">
               <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="scr-as01-search" placeholder="ค้นหาชื่อ-สกุล (เช่น นางนารีรัตน์, ชินพันธ์, พินคำ), เลขบัตร 13 หลัก, รหัส..." oninput="renderScreeningAs01Table()" />
+                <input type="text" id="scr-as01-search" placeholder="ค้นหาชื่อ-สกุล (เช่น นางนารีรัตน์, ชินพันธ์, นายสินต๊ะ), เลขบัตร 13 หลัก, รหัส (NM001, OCM001)..." oninput="renderScreeningAs01Table()" />
               </div>
               <select id="scr-as01-tab" onchange="renderScreeningAs01Table()">
-                <option value="ALL">ทุกแท็บข้อมูล (ทั้งหมด 283 ราย)</option>
-                <option value="TARGET_130">เฉพาะแท็บรายชื่อเก็บปัสสาวะ (130 ราย)</option>
-                <option value="GENERAL_153">เฉพาะแท็บการตอบกลับ - คัดกรองทั่วไป (153 ราย)</option>
+                <option value="ALL">แท็บที่ 1: การตอบกลับทั้งหมด (243 ราย)</option>
+                <option value="TARGET_90">แท็บที่ 2: เฉพาะรายชื่อเก็บปัสสาวะ (90 ราย)</option>
+                <option value="GENERAL_153">เฉพาะคัดกรองทั่วไปที่ไม่ได้เก็บปัสสาวะ (153 ราย)</option>
               </select>
               <select id="scr-as01-risk" onchange="renderScreeningAs01Table()">
                 <option value="ALL">ทุกระดับความเสี่ยง</option>
-                <option value="มาก">ความเสี่ยงมาก/สูง (&gt;20)</option>
-                <option value="ปานกลาง">ความเสี่ยงปานกลาง (10-20)</option>
+                <option value="มาก">ความเสี่ยงมาก/สูง (≥20)</option>
+                <option value="ปานกลาง">ความเสี่ยงปานกลาง (10-&lt;20)</option>
                 <option value="ต่ำ">ความเสี่ยงต่ำ (0-&lt;10)</option>
               </select>
             </div>
@@ -503,17 +654,17 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>เลขที่แบบคัดกรอง / แท็บที่มา</th>
+                    <th>รหัส / แท็บข้อมูล</th>
                     <th>วันที่ลงสำรวจ</th>
                     <th>ชื่อ - นามสกุล</th>
                     <th>อายุ/เพศ</th>
-                    <th>เลข 13 หลัก</th>
-                    <th>ที่อยู่ (บ้าน/หมู่/ตำบล)</th>
+                    <th>ที่อยู่ (บ้าน/หมู่/ตำบล/รพ.สต.)</th>
+                    <th>ระยะเวลาที่สัมผัส (ปี)</th>
                     <th>อาชีพสัมผัสสารหนู</th>
                     <th>โรคประจำตัว / อาการ</th>
-                    <th>คะแนนรวม (เต็ม 30.5)</th>
+                    <th>คะแนนรวม</th>
                     <th>ระดับความเสี่ยง</th>
-                    <th>มาตรการ</th>
+                    <th>ผลคัดกรอง 2Q</th>
                     <th>จัดการ</th>
                   </tr>
                 </thead>
@@ -540,15 +691,58 @@
                     <th>อายุ/เพศ/นน./สส.</th>
                     <th>เบอร์โทรศัพท์</th>
                     <th>ที่อยู่ & รัศมี 1 กม.</th>
+                    <th>ระยะเวลาที่สัมผัส (ปี)</th>
                     <th>ยาสมุนไพร / บุหรี่ / สุรา</th>
                     <th>อาหารทะเล (ใน 3 วันก่อนตรวจ)</th>
                     <th>แหล่งน้ำดื่ม / น้ำใช้หลัก</th>
-                    <th>การกินข้าว/ผักปลูกเอง</th>
                     <th>ผู้สัมภาษณ์ / รพ.สต.</th>
                     <th>จัดการ</th>
                   </tr>
                 </thead>
                 <tbody id="scr-as02-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Sub-view 3: 2Q Mental Health Screening Table -->
+          <div id="subview-2q" style="display:none;">
+            <div class="filter-toolbar">
+              <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="scr-2q-search" placeholder="ค้นหาชื่อ-สกุล, เลขบัตรประชาชน, รพ.สต., หมู่บ้าน..." oninput="renderScreening2QTable()" />
+              </div>
+              <select id="scr-2q-tab" onchange="renderScreening2QTable()">
+                <option value="ALL">แท็บการตอบกลับทั้งหมด (243 ราย)</option>
+                <option value="TARGET_90">เฉพาะแท็บรายชื่อเก็บปัสสาวะ (90 ราย)</option>
+                <option value="GENERAL_153">เฉพาะคัดกรองทั่วไป (153 ราย)</option>
+              </select>
+              <select id="scr-2q-status" onchange="renderScreening2QTable()">
+                <option value="ALL">ทุกสถานะการคัดกรอง 2Q</option>
+                <option value="เสี่ยงภาวะซึมเศร้า (2Q+)">มีความเสี่ยงภาวะซึมเศร้า (2Q Positive)</option>
+                <option value="ปกติ (2Q-)">ปกติ ไม่พบความเสี่ยง (2Q Negative)</option>
+                <option value="ยังไม่คัดกรอง">รอการคัดกรอง 2Q</option>
+              </select>
+              <button class="btn btn-primary btn-sm" style="background:#7c3aed; border-color:#6d28d9;" onclick="open2QModal()">
+                <i class="fa-solid fa-plus"></i> + บันทึกผลคัดกรอง 2Q
+              </button>
+            </div>
+            <div class="table-responsive" style="max-height:460px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>รหัส / แท็บข้อมูล</th>
+                    <th>ชื่อ - นามสกุล</th>
+                    <th>อายุ/เพศ</th>
+                    <th>หมู่ที่ / ตำบล / รพ.สต.</th>
+                    <th>ความเสี่ยงสารหนู</th>
+                    <th>ข้อ 1: หดหู่ เศร้า ท้อแท้</th>
+                    <th>ข้อ 2: เบื่อ ไม่เพลิดเพลิน</th>
+                    <th>สรุปผลคัดกรอง 2Q</th>
+                    <th>วันที่คัดกรอง / ผู้ประเมิน</th>
+                    <th>จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="scr-2q-tbody"></tbody>
               </table>
             </div>
           </div>
@@ -624,6 +818,7 @@
                 <th>พิกัด UTM (E, N) & Lat/Lng</th>
                 <th>ระยะห่างแม่น้ำกก</th>
                 <th>การใช้งาน</th>
+                <th>รูปภาพ/ไฟล์แนบ (≤5)</th>
                 <th>ผู้ใช้น้ำ (ครัวเรือน/เชื่อมโยง)</th>
                 <th>รพ.สต.</th>
                 <th>จัดการ</th>
@@ -635,36 +830,36 @@
       </div>
     </main>
 
-    <!-- ==================== TAB 4: RESPONDENTS MANAGEMENT (283 RECORDS) ==================== -->
+    <!-- ==================== TAB 4: RESPONDENTS MANAGEMENT (243 RESPONSE / 90 URINE RECORDS) ==================== -->
     <main id="tab-respondents" class="tab-content">
       <div class="content-card">
         <div class="card-header-bar">
           <div>
-            <h2><i class="fa-solid fa-users"></i> ทะเบียนผู้รับการคัดกรองความเสี่ยงสารหนู Env-As-01 ทั้งหมด (283 ราย)</h2>
-            <p>รวมข้อมูลครบทั้ง <b>แท็บที่ 1 "การตอบกลับ" (283 ราย)</b> และ <b>แท็บที่ 2 "รายชื่อเก็บปัสสาวะ" (130 ราย)</b> พร้อมเชื่อมโยงจุดแหล่งน้ำ</p>
+            <h2><i class="fa-solid fa-users"></i> ทะเบียนผู้รับการคัดกรองความเสี่ยงสารหนู Env-As-01 (รวมรายชื่อซ้ำ 243 ราย / เก็บปัสสาวะ 90 ราย)</h2>
+            <p>แสดงข้อมูลแยกชัดเจนตามไฟล์ <code>Env_As_01_รวมรายชื่อซ้ำ.xlsx</code> ทั้ง <b>แท็บที่ 1 "การตอบกลับ" (243 ราย)</b> และ <b>แท็บที่ 2 "รายชื่อเก็บปัสสาวะ" (90 ราย)</b> พร้อมระยะเวลาที่สัมผัส (ปี) และผลคัดกรอง 2Q</p>
           </div>
           <div class="header-actions">
             <button class="btn btn-success" onclick="openRespondentModal()">
               <i class="fa-solid fa-user-plus"></i> เพิ่มรายชื่อผู้รับการประเมิน (Env-As-01)
             </button>
-            <button class="btn btn-outline" onclick="switchTab('tab-import')">
-              <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ CSV จำนวนมาก
+            <button class="btn btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="open2QModal()">
+              <i class="fa-solid fa-brain"></i> + คัดกรองสุขภาพจิต 2Q
             </button>
             <button class="btn btn-outline" onclick="exportRespondentsCsv()">
-              <i class="fa-solid fa-file-excel"></i> ส่งออกตาราง CSV (283 ราย)
+              <i class="fa-solid fa-file-excel"></i> ส่งออกตาราง CSV (243 / 90 ราย)
             </button>
           </div>
         </div>
 
         <div class="pivot-summary-box">
-          <h4><i class="fa-solid fa-table-cells"></i> ตารางสรุปจำนวนผู้รับการคัดกรองแยกตามกลุ่มเป้าหมายและแท็บที่มา (อัปเดตอัตโนมัติ)</h4>
-          <table class="pivot-table" style="max-width:750px;">
+          <h4><i class="fa-solid fa-table-cells"></i> ตารางสรุปจำนวนผู้รับการคัดกรองแยกตามแท็บที่มา (แท็บการตอบกลับ 243 ราย vs แท็บรายชื่อเก็บปัสสาวะ 90 ราย)</h4>
+          <table class="pivot-table" style="max-width:850px;">
             <thead>
               <tr>
                 <th>กลุ่มเป้าหมาย / แท็บที่มา (Row Labels)</th>
-                <th>ต.ท่าตอน</th>
-                <th>ต.แม่นาวาง</th>
-                <th>รวมทั้งหมด (Grand Total)</th>
+                <th class="text-center">ต.ท่าตอน</th>
+                <th class="text-center">ต.แม่นาวาง</th>
+                <th class="text-center">รวมทั้งหมด (Grand Total)</th>
               </tr>
             </thead>
             <tbody id="pivot-summary-body"></tbody>
@@ -674,30 +869,36 @@
         <div class="filter-toolbar">
           <div class="search-box">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="resp-search" placeholder="ค้นหา ชื่อ-นามสกุล (เช่น นางนารีรัตน์, ชินพันธ์, พินคำ), เลขบัตร 13 หลัก, รหัส code (GEN001, NM001, OCM001)..." oninput="renderRespondentsTable()" />
+            <input type="text" id="resp-search" placeholder="ค้นหา ชื่อ-นามสกุล (เช่น นางนารีรัตน์, ชินพันธ์, นายสินต๊ะ), เลขบัตร 13 หลัก, รหัส code (GEN001, NM001, OCM001)..." oninput="renderRespondentsTable()" />
           </div>
           <select id="resp-filter-tab" onchange="renderRespondentsTable()">
-            <option value="ALL">ทุกแท็บข้อมูล (ทั้งหมด 283 ราย)</option>
-            <option value="TARGET_130">เฉพาะแท็บรายชื่อเก็บปัสสาวะ (130 ราย)</option>
-            <option value="GENERAL_153">เฉพาะแท็บการตอบกลับ - คัดกรองทั่วไป (153 ราย)</option>
+            <option value="ALL">แท็บที่ 1: การตอบกลับทั้งหมด (243 ราย)</option>
+            <option value="TARGET_90">แท็บที่ 2: เฉพาะรายชื่อเก็บปัสสาวะ (90 ราย)</option>
+            <option value="GENERAL_153">เฉพาะคัดกรองทั่วไปที่ไม่ได้เก็บปัสสาวะ (153 ราย)</option>
           </select>
           <select id="resp-filter-tambon" onchange="renderRespondentsTable()">
             <option value="ALL">ทุกตำบล</option>
             <option value="ท่าตอน">ต.ท่าตอน</option>
             <option value="แม่นาวาง">ต.แม่นาวาง</option>
           </select>
+          <select id="resp-filter-hc" onchange="renderRespondentsTable()">
+            <option value="ALL">ทุก รพ.สต.</option>
+            <option value="รพ.สต.บ้านท่าตอน">รพ.สต.บ้านท่าตอน</option>
+            <option value="รพ.สต.บ้านท่ามะแกง">รพ.สต.บ้านท่ามะแกง</option>
+            <option value="รพ.สต.บ้านเมืองงาม">รพ.สต.บ้านเมืองงาม</option>
+            <option value="รพ.สต.บ้านแม่เมืองน้อย">รพ.สต.บ้านแม่เมืองน้อย</option>
+          </select>
           <select id="resp-filter-group" onchange="renderRespondentsTable()">
             <option value="ALL">ทุกกลุ่มเป้าหมาย</option>
             <option value="ประชาชนทั่วไป (แท็บการตอบกลับ)">ประชาชนทั่วไป (แท็บการตอบกลับ 153 ราย)</option>
-            <option value="กลุ่มใหม่">กลุ่มใหม่ (80 ราย)</option>
-            <option value="กลุ่มเดิม 68">กลุ่มเดิม 68 (40 ราย)</option>
-            <option value="ผู้ประกอบอาชีพ">ผู้ประกอบอาชีพ (10 ราย)</option>
+            <option value="กลุ่มใหม่">กลุ่มใหม่ (เก็บปัสสาวะ 80 ราย)</option>
+            <option value="ผู้ประกอบอาชีพ">ผู้ประกอบอาชีพ (เก็บปัสสาวะ 10 ราย)</option>
           </select>
           <select id="resp-filter-risk" onchange="renderRespondentsTable()">
             <option value="ALL">ทุกระดับความเสี่ยง</option>
             <option value="ต่ำ">ความเสี่ยงต่ำ (&lt;10)</option>
-            <option value="ปานกลาง">ความเสี่ยงปานกลาง (10-20)</option>
-            <option value="มาก">ความเสี่ยงสูง/มาก (&gt;20)</option>
+            <option value="ปานกลาง">ความเสี่ยงปานกลาง (10-&lt;20)</option>
+            <option value="มาก">ความเสี่ยงสูง/มาก (≥20)</option>
           </select>
           <select id="resp-filter-well" onchange="renderRespondentsTable()">
             <option value="ALL">ทุกจุดบ่อน้ำ</option>
@@ -714,13 +915,14 @@
                 <th>ชื่อ - นามสกุล</th>
                 <th>อายุ/เพศ</th>
                 <th>เลขบัตรประชาชน</th>
-                <th>บ้านเลขที่ / หมู่ / ตำบล</th>
+                <th>บ้านเลขที่ / หมู่ / ตำบล / รพ.สต.</th>
+                <th>ระยะสัมผัส (ปี)</th>
                 <th>จุดบ่อน้ำที่ใช้</th>
                 <th>อาชีพ/ลักษณะงาน</th>
                 <th>คะแนนรวม</th>
                 <th>ระดับความเสี่ยง</th>
+                <th>ผลคัดกรอง 2Q</th>
                 <th>เกณฑ์คัดกรอง (Cut point)</th>
-                <th>กลุ่มเป้าหมาย</th>
                 <th>จัดการ</th>
               </tr>
             </thead>
@@ -1094,7 +1296,7 @@
         <div id="sheets-lock-banner" class="admin-lock-banner">
           <div>
             <i class="fa-solid fa-shield-halved"></i>
-            <b>ระบบป้องกันการแก้ไขลิงก์ Google Sheets:</b> ช่องลิงก์ Web App URL ถูกล็อกไว้เพื่อป้องกันการแก้ไขโดยไม่ตั้งใจ (ผู้ใช้งานทั่วไปยังสามารถกดปุ่มซิงค์รับ-ส่งข้อมูลได้ตามปกติ)
+            <span id="sheets-lock-text"><b>ระบบจดจำลิงก์ Google Sheets อัตโนมัติ:</b> เมื่อวางลิงก์แล้ว ระบบจะบันทึกไว้ทั้งในเครื่อง (LocalStorage + IndexedDB) และซิงค์ข้อมูลอัตโนมัติทุกครั้งที่เปิดโปรแกรม</span>
           </div>
           <button type="button" class="btn btn-sm btn-outline" id="btn-unlock-gas" onclick="toggleUnlockGasInput()">
             <i class="fa-solid fa-key"></i> ปลดล็อกแก้ไขลิงก์ (เฉพาะ Admin)
@@ -1105,26 +1307,35 @@
           <div class="cloud-box" style="border:2px solid #0f766e; background:#f0fdf4;">
             <h3><i class="fa-brands fa-google-drive"></i> เชื่อมต่อและซิงค์ข้อมูลทั้งหมดเข้า Google Sheets</h3>
             <div class="form-group" style="margin-top:12px;">
-              <label>ลิงก์ Google Apps Script Web App URL (ที่ลงท้ายด้วย <code>/exec</code>):</label>
-              <input type="url" id="gas-url-input" readonly style="background:#e2e8f0; cursor:not-allowed;" placeholder="https://script.google.com/macros/s/xxxxxx/exec (กดปุ่มปลดล็อกด้านบนเพื่อแก้ไข)" />
+              <label>ลิงก์ Google Apps Script Web App URL (ที่ลงท้ายด้วย <code>/exec</code>) — <i>วางลิงก์แล้วระบบบันทึกให้อัตโนมัติทันที</i>:</label>
+              <input type="url" id="gas-url-input" oninput="autoSaveGasUrlInput(this.value)" onchange="autoSaveGasUrlInput(this.value)" placeholder="https://script.google.com/macros/s/xxxxxx/exec" />
             </div>
             <div class="button-row">
-              <button class="btn btn-primary" id="btn-save-gas-url" onclick="saveGasUrl()" disabled>
-                <i class="fa-solid fa-floppy-disk"></i> 1. บันทึกลิงก์เชื่อมต่อ
+              <button class="btn btn-primary" id="btn-save-gas-url" onclick="saveGasUrl()">
+                <i class="fa-solid fa-floppy-disk"></i> 1. บันทึกและล็อกลิงก์เชื่อมต่อ
               </button>
               <button class="btn btn-success" onclick="syncAllToGoogleSheets()">
-                <i class="fa-solid fa-cloud-arrow-up"></i> 2. ส่งข้อมูลปัจจุบันทั้งหมดขึ้น Google Sheets ทันที
+                <i class="fa-solid fa-cloud-arrow-up"></i> 2. อัปโหลดข้อมูลเริ่มต้นทั้งหมดขึ้น Google Sheets
               </button>
               <button class="btn btn-outline" onclick="pullFromGoogleSheets()">
                 <i class="fa-solid fa-cloud-arrow-down"></i> ดึงข้อมูลล่าสุดจาก Google Sheets
               </button>
+            </div>
+            <div style="margin-top:10px; padding:10px 12px; background:#eff6ff; border:1px solid #93c5fd; border-radius:8px; font-size:12.5px;">
+              <b><i class="fa-solid fa-thumbtack"></i> ไม่ต้องเชื่อมต่อใหม่เมื่อเปลี่ยนเครื่องหรืออัปขึ้น GitHub:</b><br/>
+              หลังจากวางลิงก์ด้านบนแล้ว คุณสามารถกดปุ่มด้านล่างนี้เพื่อฝังลิงก์ลงในไฟล์ <code>app.js</code> ถาวร เมื่อนำไปเปิดเครื่องอื่นหรืออัปโหลดขึ้น GitHub Pages โปรแกรมจะเชื่อมต่อ Google Sheets ลิงก์นี้ให้อัตโนมัติทุกครั้งโดยไม่ต้องวางลิงก์ใหม่!
+              <div style="margin-top:8px;">
+                <button type="button" class="btn btn-sm btn-primary" style="background:#1d4ed8;" onclick="saveGasUrlToAppJsFile()">
+                  <i class="fa-solid fa-file-code"></i> 📌 บันทึกฝังลิงก์นี้ลงในไฟล์ app.js ถาวร (ไม่ต้องเชื่อมต่อใหม่อีกเลย)
+                </button>
+              </div>
             </div>
             <div id="cloud-sync-log" class="sync-log">สถานะ: พร้อมซิงค์ข้อมูล (147 บ่อน้ำ + ผลแล็บน้ำ + 283 Env-As-01 + Env-As-02 + คู่มือ)</div>
 
             <hr style="margin: 16px 0;" />
             <div class="button-row">
               <button class="btn btn-danger btn-sm" onclick="resetToSeedData()">
-                <i class="fa-solid fa-rotate-left"></i> ล้างแคช / รีเซ็ตข้อมูลเริ่มต้นใหม่ทั้งหมด (สำหรับ Admin)
+                <i class="fa-solid fa-rotate-left"></i> ล้างแคชข้อมูล (โดยยังคงจำลิงก์ Google Sheets ไว้เหมือนเดิม)
               </button>
             </div>
           </div>
@@ -1311,6 +1522,25 @@
             <label>หมายเหตุเพิ่มเติม</label>
             <textarea id="well-notes" rows="2" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
           </div>
+
+          <!-- ส่วนแนบรูปภาพและไฟล์ PDF ของแหล่งน้ำ (สูงสุดไม่เกิน 5 ไฟล์: JPEG, PNG, PDF) -->
+          <div class="form-section" style="background:#f0f9ff; border:1px dashed #38bdf8; border-radius:10px; padding:12px 14px; margin-top:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+              <h4 style="margin:0; font-size:13.5px; color:#0369a1;">
+                <i class="fa-solid fa-camera-retro"></i> รูปภาพและไฟล์เอกสารจุดแหล่งน้ำ (สูงสุดไม่เกิน 5 ไฟล์ — รองรับไฟล์ .JPEG, .JPG, .PNG, .PDF)
+              </h4>
+              <span class="badge-pill" style="background:#e0f2fe; color:#0284c7; font-weight:700;">
+                แนบแล้ว <span id="well-files-count">0</span> / 5 ไฟล์
+              </span>
+            </div>
+            <div class="form-group" style="margin-bottom:8px;">
+              <input type="file" id="well-files-input" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple onchange="handleWellFilesSelect(event)" style="background:#fff; padding:6px;" />
+              <small style="color:#64748b; display:block; margin-top:4px;">
+                สามารถเลือกเพิ่มรูปถ่ายบ่อน้ำหรือไฟล์ผลตรวจ PDF ได้สูงสุด 5 ไฟล์ต่อ 1 บ่อน้ำ (ระบบย่อขนาดภาพอัตโนมัติเพื่อให้บันทึกและแสดงผลได้รวดเร็ว)
+              </small>
+            </div>
+            <div id="well-files-preview" class="well-attachments-grid"></div>
+          </div>
         </div>
         <div class="modal-footer">
           <span style="font-size:12px; color:#64748b;"><i class="fa-solid fa-circle-info"></i> เลื่อนขึ้น-ลงเพื่อกรอกข้อมูลให้ครบถ้วน</span>
@@ -1464,7 +1694,7 @@
               </div>
             </div>
 
-            <div class="form-grid-3">
+            <div class="form-grid-4">
               <div class="form-group">
                 <label>5. สถานภาพสมรส</label>
                 <select id="resp-marital" onchange="toggleOtherInput(this, 'resp-marital-other-wrap')">
@@ -1494,6 +1724,10 @@
               <div class="form-group">
                 <label>7. ท่านอยู่ในพื้นที่นี้มานานกี่ปี (ปี)</label>
                 <input type="text" id="resp-years-area" placeholder="เช่น 35" />
+              </div>
+              <div class="form-group">
+                <label style="color:#0369a1; font-weight:700;">8. ระยะเวลาที่สัมผัสสารหนู/แหล่งน้ำ (จำนวนปี) *</label>
+                <input type="number" step="0.5" min="0" id="resp-exposure-years" placeholder="ระบุจำนวนปีที่สัมผัส เช่น 10" style="border-color:#38bdf8; background:#f0f9ff; font-weight:600;" />
               </div>
             </div>
 
@@ -1706,11 +1940,36 @@
             </table>
           </div>
 
+          <!-- ส่วนที่ 5: แบบคัดกรองสุขภาพจิต 2Q (โรคซึมเศร้า 2 คำถาม) -->
+          <div class="form-section-box" id="as01-sec-2q" style="background:#f5f3ff; border-color:#c4b5fd; margin-top:14px;">
+            <h4 style="color:#6d28d9;"><i class="fa-solid fa-brain"></i> ส่วนเพิ่มเติม: การคัดกรองสุขภาพจิต 2Q (แบบคัดกรองโรคซึมเศร้า 2 คำถาม)</h4>
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label>ข้อ 1. ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ ท่านรู้สึกหดหู่ เศร้า หรือท้อแท้สิ้นหวัง หรือไม่</label>
+                <select id="resp-q2-1" onchange="recalcModalAs01_2Q()">
+                  <option value="ไม่ใช่">ไม่ใช่ (ปกติ = 0)</option>
+                  <option value="ใช่">ใช่ (มีอาการ = 1)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ข้อ 2. ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ ท่านรู้สึกเบื่อ ทำอะไรก็ไม่เพลิดเพลิน หรือไม่</label>
+                <select id="resp-q2-2" onchange="recalcModalAs01_2Q()">
+                  <option value="ไม่ใช่">ไม่ใช่ (ปกติ = 0)</option>
+                  <option value="ใช่">ใช่ (มีอาการ = 1)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>สรุปผลการคัดกรอง 2Q</label>
+                <input type="text" id="resp-status-2q" readonly value="ยังไม่คัดกรอง" style="background:#fff; font-weight:700; color:#4c1d95;" />
+              </div>
+            </div>
+          </div>
+
         </div>
         <div class="modal-footer">
           <div style="display:flex; gap:6px;">
             <button type="button" class="btn btn-outline btn-sm" onclick="scrollToModalSection('resp-modal-body', 'as01-sec-header')">&uarr; ขึ้นบนสุด</button>
-            <button type="button" class="btn btn-outline btn-sm" onclick="scrollToModalSection('resp-modal-body', 'as01-sec-4')">&darr; ไปส่วนที่ 4</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="scrollToModalSection('resp-modal-body', 'as01-sec-4')">&darr; ไปส่วนที่ 4 & 2Q</button>
           </div>
           <div style="display:flex; gap:8px;">
             <button type="button" class="btn btn-outline" onclick="closeRespondentModal()">ยกเลิก</button>
@@ -1743,7 +2002,7 @@
 
           <!-- ดึงข้อมูลจากผู้รับการประเมิน Env-As-01 อัตโนมัติ -->
           <div class="form-section-box highlight-section" id="as02-sec-header">
-            <h4><i class="fa-solid fa-user-check"></i> เลขที่แบบฟอร์ม Env-As-02, วันที่ลงสำรวจ & ดึงข้อมูลจากทะเบียน Env-As-01 (283 ราย)</h4>
+            <h4><i class="fa-solid fa-user-check"></i> เลขที่แบบฟอร์ม Env-As-02, วันที่ลงสำรวจ & ดึงข้อมูลจากทะเบียน Env-As-01 (243 / 90 ราย)</h4>
             <div class="form-grid-4">
               <div class="form-group">
                 <label>เลขที่แบบฟอร์ม Env-As-02 *</label>
@@ -1754,7 +2013,7 @@
                 <input type="date" id="as02-date" required value="2026-10-27" />
               </div>
               <div class="form-group">
-                <label>ดึงข้อมูลจากรายชื่อในระบบ (283 ราย)</label>
+                <label>ดึงข้อมูลจากรายชื่อในระบบ (243 ราย)</label>
                 <select id="as02-fill-from-resp" onchange="autofillAs02FromRespondent(this.value)">
                   <option value="">-- เลือกเพื่อดึงข้อมูลส่วนบุคคลอัตโนมัติ --</option>
                 </select>
@@ -1825,7 +2084,7 @@
               </div>
             </div>
 
-            <div class="form-grid-3">
+            <div class="form-grid-4">
               <div class="form-group">
                 <label>5. สถานภาพสมรส</label>
                 <select id="as02-marital" onchange="toggleOtherInput(this, 'as02-marital-other-wrap')">
@@ -1858,6 +2117,10 @@
                   <input type="number" id="as02-years" placeholder="อยู่ในพื้นที่ (ปี)" />
                   <input type="number" id="as02-hours-home" placeholder="ชม./วัน" value="12" />
                 </div>
+              </div>
+              <div class="form-group">
+                <label style="color:#0369a1; font-weight:700;">ระยะเวลาที่สัมผัสสารหนู/แหล่งน้ำ (จำนวนปี) *</label>
+                <input type="number" step="0.5" min="0" id="as02-exposure-years" placeholder="ระบุจำนวนปีที่สัมผัส เช่น 10" style="border-color:#38bdf8; background:#f0f9ff; font-weight:600;" />
               </div>
             </div>
 
@@ -2133,6 +2396,31 @@
               </div>
             </div>
 
+            <!-- คัดกรองสุขภาพจิต 2Q ในแบบฟอร์ม Env-As-02 -->
+            <div style="background:#f5f3ff; border:1px solid #c4b5fd; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+              <h5 style="margin:0 0 8px; font-size:13px; color:#6d28d9;"><i class="fa-solid fa-brain"></i> การคัดกรองสุขภาพจิต 2Q (โรคซึมเศร้า 2 คำถาม)</h5>
+              <div class="form-grid-3">
+                <div class="form-group" style="margin:0;">
+                  <label>ข้อ 1. ใน 2 สัปดาห์ที่ผ่านมา รู้สึกหดหู่ เศร้า หรือท้อแท้สิ้นหวัง</label>
+                  <select id="as02-q2-1" onchange="recalcModalAs02_2Q()">
+                    <option value="ไม่ใช่">ไม่ใช่ (ปกติ = 0)</option>
+                    <option value="ใช่">ใช่ (มีอาการ = 1)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label>ข้อ 2. ใน 2 สัปดาห์ที่ผ่านมา รู้สึกเบื่อ ทำอะไรก็ไม่เพลิดเพลิน</label>
+                  <select id="as02-q2-2" onchange="recalcModalAs02_2Q()">
+                    <option value="ไม่ใช่">ไม่ใช่ (ปกติ = 0)</option>
+                    <option value="ใช่">ใช่ (มีอาการ = 1)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label>สรุปผลคัดกรอง 2Q</label>
+                  <input type="text" id="as02-status-2q" readonly value="ยังไม่คัดกรอง" style="background:#fff; font-weight:700; color:#4c1d95;" />
+                </div>
+              </div>
+            </div>
+
             <!-- ผู้สัมภาษณ์ / ตำแหน่ง / รพ.สต. -->
             <div class="form-grid-3">
               <div class="form-group">
@@ -2393,6 +2681,112 @@
         </div>
       </div>
       <div class="modal-body" id="kb-viewer-body" style="padding:0; height:100%; overflow:hidden; display:flex; flex-direction:column; background:#1e293b;">
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 8: 2Q MENTAL HEALTH SCREENING MODAL ==================== -->
+  <div id="modal-2q" class="modal-backdrop" style="display:none;">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header" style="background:linear-gradient(90deg, #5b21b6 0%, #7c3aed 100%); color:#fff;">
+        <h3 style="color:#fff;"><i class="fa-solid fa-brain"></i> บันทึกผลการคัดกรองโรคซึมเศร้าด้วย 2 คำถาม (2Q)</h3>
+        <button type="button" class="btn-close" style="color:#fff;" onclick="close2QModal()">&times;</button>
+      </div>
+      <form id="form-2q" onsubmit="handleSave2QModal(event)">
+        <div class="modal-body">
+          <div class="form-section" style="background:#f5f3ff; border-color:#ddd6fe;">
+            <h4 class="sec-title" style="color:#5b21b6;"><i class="fa-solid fa-user-check"></i> 1. เลือกผู้รับการคัดกรอง 2Q (จากทะเบียน 243 ราย หรือค้นหาชื่อ)</h4>
+            <div class="form-grid-3">
+              <div class="form-group" style="grid-column: span 2;">
+                <label>เลือกผู้รับการคัดกรองจากรายชื่อในระบบ *</label>
+                <select id="m2q-resp-select" required onchange="onSelect2QRespondent(this.value)"></select>
+              </div>
+              <div class="form-group">
+                <label>วันที่คัดกรอง 2Q *</label>
+                <input type="date" id="m2q-date" required />
+              </div>
+            </div>
+            <div id="m2q-person-info" style="font-size:12.5px; color:#4c1d95; background:#ede9fe; padding:8px 12px; border-radius:8px; margin-top:6px;">
+              กรุณาเลือกรายชื่อผู้รับการคัดกรอง...
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="sec-title"><i class="fa-solid fa-clipboard-question"></i> 2. คำถามคัดกรองโรคซึมเศร้า 2 คำถาม (2Q) — ในช่วง 2 สัปดาห์ที่ผ่านมา รวมวันนี้</h4>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div style="font-weight:600; color:#1e293b; font-size:14px;">
+                  1. ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ ท่านรู้สึก <b>หดหู่ เศร้า หรือท้อแท้สิ้นหวัง</b> หรือไม่?
+                </div>
+                <div style="display:flex; gap:14px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:#15803d;">
+                    <input type="radio" name="m2q_q1" id="m2q-q1-no" value="ไม่ใช่" checked onchange="evaluate2QModalLive()" /> ไม่ใช่ (ปกติ)
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:700; color:#b91c1c;">
+                    <input type="radio" name="m2q_q1" id="m2q-q1-yes" value="ใช่" onchange="evaluate2QModalLive()" /> ใช่ (มีอาการ)
+                  </label>
+                </div>
+              </div>
+
+              <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div style="font-weight:600; color:#1e293b; font-size:14px;">
+                  2. ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ ท่านรู้สึก <b>เบื่อ ทำอะไรก็ไม่เพลิดเพลิน</b> หรือไม่?
+                </div>
+                <div style="display:flex; gap:14px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:#15803d;">
+                    <input type="radio" name="m2q_q2" id="m2q-q2-no" value="ไม่ใช่" checked onchange="evaluate2QModalLive()" /> ไม่ใช่ (ปกติ)
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:700; color:#b91c1c;">
+                    <input type="radio" name="m2q_q2" id="m2q-q2-yes" value="ใช่" onchange="evaluate2QModalLive()" /> ใช่ (มีอาการ)
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div id="m2q-live-banner" class="score-summary-banner" style="margin-top:14px; background:#f0fdf4; border:1px solid #86efac; color:#166534;">
+              <div>
+                <span>สรุปผลการประเมิน 2Q: </span>
+                <strong id="m2q-live-result" style="font-size:15px;">ปกติ ไม่พบความเสี่ยงโรคซึมเศร้า (2Q Negative)</strong>
+              </div>
+              <span id="m2q-live-advice" style="font-size:12.5px;">แนวทาง: แจ้งผลให้ทราบ แนะนำการดูแลสุขภาพจิตเบื้องต้น</span>
+            </div>
+
+            <div class="form-grid-2" style="margin-top:12px;">
+              <div class="form-group">
+                <label>เจ้าหน้าที่ผู้คัดกรอง / ประเมิน 2Q</label>
+                <input type="text" id="m2q-assessor" value="เจ้าหน้าที่สาธารณสุข อ.แม่อาย" placeholder="ระบุชื่อผู้ประเมิน" />
+              </div>
+              <div class="form-group">
+                <label>หมายเหตุ / การส่งต่อประเมิน 9Q</label>
+                <input type="text" id="m2q-note" placeholder="เช่น ส่งต่อประเมิน 9Q หรือ ให้คำปรึกษาเบื้องต้น..." />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span style="font-size:12px; color:#64748b;">ผลการคัดกรอง 2Q จะอัปเดตขึ้นแดชบอร์ดและเชื่อมโยงกับข้อมูล Env-As-01 / Env-As-02 ทันที</span>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn-outline" onclick="close2QModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary" style="background:#7c3aed; border-color:#6d28d9;">
+              <i class="fa-solid fa-floppy-disk"></i> บันทึกผลการคัดกรอง 2Q
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 9: WELL PHOTOS / PDF ATTACHMENTS VIEWER ==================== -->
+  <div id="well-gallery-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3 id="well-gallery-title"><i class="fa-solid fa-images"></i> รูปภาพและไฟล์แนบของจุดแหล่งน้ำ</h3>
+        <button type="button" class="btn-close" onclick="closeWellGalleryModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="well-gallery-body"></div>
+      <div class="modal-footer">
+        <span style="font-size:12px; color:#64748b;">สามารถเพิ่มหรือแก้ไขไฟล์แนบ (สูงสุด 5 ไฟล์: JPEG, PNG, PDF) ได้ที่ปุ่มแก้ไขจุดแหล่งน้ำ</span>
+        <button type="button" class="btn btn-primary" onclick="closeWellGalleryModal()">ปิดหน้าต่าง</button>
       </div>
     </div>
   </div>
