@@ -1,4 +1,4 @@
-﻿const RAW_WELLS_147 = [
+const RAW_WELLS_147 = [
     {
         "well_id":  "W001-P1",
         "seq":  1,
@@ -2793,6 +2793,7 @@
         "health_center":  ""
     }
 ];
+
 
 const RAW_SURVEY_DATA = [
     {
@@ -15367,7 +15368,7 @@ const INITIAL_RESPONDENTS = RAW_SURVEY_DATA.map((r) => {
     health_center: hc,
     notes: 'แท็บที่มา: ' + sourceTabLabel + (cutPointLabel ? ' | เกณฑ์: ' + cutPointLabel : ''),
     updated_at: '2026-10-28 18:00',
-    updated_by: 'ระบบเริ่มต้น (Env_As_01_รวมรายชื่อซ้ำ 243 ราย / เก็บปัสสาวะ 90 ราย)'
+    updated_by: 'ระบบเริ่มต้น (Env_As_01 แบบคัดกรองความเสี่ยง_แม่อาย69_tn283 243 ราย / เก็บปัสสาวะ 90 ราย)'
   };
 });
 
