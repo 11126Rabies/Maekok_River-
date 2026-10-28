@@ -1308,3 +1308,103 @@ h1, h2, h3, h4, .nav-tab, .btn {
   .form-grid-4, .form-grid-3, .env-questions-grid, .cloud-grid, .dash-grid-3, .dash-grid-2 { grid-template-columns: 1fr; }
 }
 
+/* Well Attachments Preview & Gallery */
+.well-attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.well-att-card {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.05);
+}
+
+.well-att-card img {
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.well-att-pdf-box {
+  width: 100%;
+  height: 92px;
+  background: #fef2f2;
+  color: #dc2626;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.well-att-name {
+  font-size: 11px;
+  color: #334155;
+  margin-top: 4px;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.well-att-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(220, 38, 38, 0.9);
+  color: #fff;
+  border: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge-2q-pos {
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.badge-2q-neg {
+  background: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.badge-2q-none {
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  display: inline-block;
+}
+
+
