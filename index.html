@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="styles.css?v=dashboard-totals-20261031" />
+  <link rel="stylesheet" href="styles.css?v=village-summary-20261031" />
 </head>
 <body>
 
@@ -223,7 +223,7 @@
             <h4 style="font-size:13px; color:#0369a1; margin-bottom:6px;">
               <i class="fa-solid fa-table-cells"></i> สรุประดับความเสี่ยง แท็บ "ประเมินแม่อาย 2569" แยกตามตำบล
             </h4>
-            <table class="pivot-table" style="max-width:100%; margin-bottom:10px;">
+            <table id="dashboard-as01-summary-table" class="pivot-table risk-summary-table" style="max-width:100%; margin-bottom:10px;">
               <thead>
                 <tr>
                   <th>ระดับความเสี่ยง (แท็บประเมินแม่อาย 2569)</th>
@@ -235,7 +235,9 @@
                 </tr>
               </thead>
               <tbody id="dash-risk-matrix-tab1-body"></tbody>
+              <tfoot id="dash-risk-matrix-tab1-foot"></tfoot>
             </table>
+            <p id="dashboard-summary-area-note-1" class="data-note" hidden></p>
           </div>
 
           <!-- Right Card: แท็บที่ 2 Env-As-02 / เก็บแม่อาย 2569 -->
@@ -252,7 +254,7 @@
             <h4 style="font-size:13px; color:#0f766e; margin-bottom:6px;">
               <i class="fa-solid fa-layer-group"></i> สรุปกลุ่มเป้าหมาย & เกณฑ์คัดเลือก แท็บ "Env-As-02 / เก็บแม่อาย 2569"
             </h4>
-            <table class="pivot-table" style="max-width:100%; margin-bottom:10px;">
+            <table id="dashboard-as02-summary-table" class="pivot-table risk-summary-table" style="max-width:100%; margin-bottom:10px;">
               <thead>
                 <tr>
                   <th>กลุ่มเป้าหมาย / เกณฑ์คัดเลือก (หมายเหตุ)</th>
@@ -262,7 +264,9 @@
                 </tr>
               </thead>
               <tbody id="dash-pivot-tab2-body"></tbody>
+              <tfoot id="dash-pivot-tab2-foot"></tfoot>
             </table>
+            <p id="dashboard-summary-area-note-2" class="data-note" hidden></p>
           </div>
         </div>
 
@@ -315,7 +319,7 @@
               <h4 style="font-size:13.5px; color:#0f172a; margin:0;">
                 <i class="fa-solid fa-house-chimney-user" style="color:#d97706;"></i> 3. แยกตามรายหมู่บ้าน (ตำบล / หมู่ที่ / รพ.สต.) แยกการคัดกรอง AS-01 และติดตาม AS-02
               </h4>
-              <span style="font-size:12px; color:#64748b;">คลิกที่แถวหมู่บ้านเพื่อดูรายชื่อผู้รับการคัดกรองในหมู่บ้านนั้น</span>
+              <span style="font-size:12px; color:#64748b;">คลิกแถวหมู่บ้านหรือปุ่ม “ดูรายชื่อ” เพื่อดูและแก้ไขข้อมูลรายบุคคล</span>
             </div>
             <div class="table-responsive" style="max-height:360px;">
               <table id="dashboard-moo-table" class="data-table compact-table stage-comparison">
@@ -2730,6 +2734,6 @@
   <!-- Main Application Logic -->
   <script src="water-history.js?v=online-20261031"></script>
   <script src="import-templates.js?v=online-20261031"></script>
-  <script src="app.js?v=dashboard-totals-20261031"></script>
+  <script src="app.js?v=village-summary-20261031"></script>
 </body>
 </html>

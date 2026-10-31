@@ -230,7 +230,7 @@ function clearSessionData() {
  state.sessionEpoch=(state.sessionEpoch||0)+1;
  for(const request of state.activeCloudRequests||[])request.abort();
  state.cloudToken=null;state.currentUser=null;state.dataLoaded=false;state.cloudVerified=false;
- state.pendingWrites=[];state.cloudFlushPromise=null;state.currentWellAttachments=[];state.detailedScreening=null;state.pickingMode=null;
+ state.pendingWrites=[];state.cloudFlushPromise=null;state.currentWellAttachments=[];state.detailedScreening=null;state.pickingMode=null;state.dashboardVillageSelection=null;
  for(const key of ['wells','respondents','envAs02','waterLabs','knowledgeDocs'])state[key]=[];
  document.getElementById('app-container').style.display='none';
  document.getElementById('login-screen').style.display='flex';
@@ -240,7 +240,7 @@ function clearSessionData() {
  state.map?.closePopup();state.markersLayer?.clearLayers();state.linksLayer?.clearLayers();
  // Re-render all dynamic tables and option lists with empty arrays, including hidden tabs.
  refreshAllViews();renderWellFilesPreview();populateAs02RespondentDropdown();
- for(const id of ['source-record-modal','review-record-modal'])document.getElementById(id)?.remove();
+ for(const id of ['source-record-modal','review-record-modal','dashboard-village-modal'])document.getElementById(id)?.remove();
  for(const id of ['well-gallery-body','well-gallery-content','current-user-display','knowledge-preview-body','kb-viewer-body','q2-modal-person-info'])setHtml(id,'');
  const personSelect=document.getElementById('q2-modal-resp-select');if(personSelect)personSelect.innerHTML='<option value="">-- เลือกรายชื่อหลังเข้าสู่ระบบ --</option>';
  const download=document.getElementById('kb-viewer-download');if(download){download.href='#';download.removeAttribute('download');}
@@ -2265,7 +2265,7 @@ function sortedWaterLabs(rows) {
 
 // Source-grounded calculations, 2569 revision. Historical source rows remain separate by stage.
 const DATA_VERSION = 'MAEAI_FISCAL_20261030_V2';
-const RELEASE_VERSION = '2026-10-31-dashboard-totals';
+const RELEASE_VERSION = '2026-10-31-village-summary';
 const ONLINE_API_REVISION = 'MAEAI_ONLINE_20261031';
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function setText(id, value) { const el=document.getElementById(id); if(el) el.textContent=value; }
@@ -2384,6 +2384,87 @@ function dashboardTotalRow(as01,as02,groupColumns,withExposure=false) {
  const known=as01.filter(r=>historyValuePresent(r.exposure_years)).length;
  return `<tr class="dashboard-total-row"><th scope="row">รวมทั้งหมด</th>${extra}${dashboardStageCountCells(as01,as02)}${withExposure?`<td>ระบุ ${known}/${as01.length} ราย</td>`:''}</tr>`;
 }
+// Village lists use authenticated in-memory records; editing reuses existing record forms.
+function dashboardVillageRecords(tambon,moo) {
+ const matches=r=>dashboardGroupLabel(r.tambon)===dashboardGroupLabel(tambon)&&dashboardGroupLabel(r.moo)===dashboardGroupLabel(moo);
+ return [
+  ...yearRows(state.respondents).filter(matches).map(record=>({stage:1,record})),
+  ...yearRows(state.envAs02,2).filter(matches).map(record=>({stage:2,record}))
+ ].sort((a,b)=>Number(historyValuePresent(a.record.health_center))-Number(historyValuePresent(b.record.health_center))||a.stage-b.stage||String(a.record.code||a.record.id).localeCompare(String(b.record.code||b.record.id),'th',{numeric:true}));
+}
+function dashboardVillageDialogMarkup(tambon,moo) {
+ const rows=dashboardVillageRecords(tambon,moo);
+ const counts=[1,2].map(stage=>rows.filter(r=>r.stage===stage).length);
+ return `<div class="modal-dialog modal-lg dashboard-village-dialog" role="dialog" aria-modal="true" aria-labelledby="dashboard-village-title">
+  <div class="modal-header"><h3 id="dashboard-village-title">รายชื่อ ต.${esc(dashboardGroupLabel(tambon))} หมู่ ${esc(dashboardGroupLabel(moo))} — ปีงบประมาณ ${state.fiscalYear}</h3><button type="button" class="btn-close" data-village-close aria-label="ปิดรายชื่อหมู่บ้าน">×</button></div>
+  <div class="modal-body"><p class="data-note">AS-01 ${counts[0]} ราย · AS-02 ${counts[1]} ราย แสดงแยกตามแบบฟอร์ม ไม่บวกเป็นจำนวนคนใหม่<br>หาก รพ.สต. ยังไม่ระบุ ให้กด “แก้ไข” ของรายการนั้น เลือกช่อง “รพ.สต. ที่รับผิดชอบ” ให้ตรงกับข้อมูลจริง แล้วบันทึก</p>
+  <div class="table-responsive"><table class="data-table compact-table dashboard-village-list"><thead><tr><th>แบบฟอร์ม</th><th>รหัสรายการ</th><th>วันที่</th><th>ชื่อ–นามสกุล</th><th>รพ.สต. ที่รับผิดชอบ</th><th>ความเสี่ยง</th><th>จัดการ</th></tr></thead><tbody>${rows.map(({stage,record:r})=>`<tr><td>AS-0${stage}</td><td>${esc(r.code||r.form_no||r.id)}</td><td>${esc((stage===1?r.survey_date:r.interview_date)||'ไม่ระบุ')}</td><td>${esc(r.full_name||'ไม่ระบุ')}</td><td>${esc(historyValuePresent(r.health_center)?r.health_center:'ยังไม่ระบุ — กรุณาแก้ไข')}</td><td><span${r.risk_level==='มาก'?' class="dashboard-risk-high"':r.risk_level==='ปานกลาง'?' class="dashboard-risk-medium"':''}>${esc(r.risk_level||'ไม่ระบุ')}</span></td><td><button type="button" class="btn btn-sm btn-primary" data-village-edit-stage="${stage}" data-village-record-id="${esc(r.id)}" aria-label="แก้ไข AS-0${stage} ${esc(r.code||r.form_no||r.id)}">แก้ไข AS-0${stage}</button></td></tr>`).join('')||'<tr><td colspan="7">ไม่มีรายการในปีงบประมาณที่เลือก</td></tr>'}</tbody></table></div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline" data-village-close>ปิดรายชื่อ</button></div></div>`;
+}
+function openDashboardVillage(tambon,moo) {
+ if(!state.currentUser||!state.cloudToken||!state.dataLoaded){alert('กรุณาเข้าสู่ระบบส่วนกลางก่อนดูรายชื่อ');return;}
+ state.dashboardVillageSelection={tambon:dashboardGroupLabel(tambon),moo:dashboardGroupLabel(moo)};
+ let modal=document.getElementById('dashboard-village-modal');
+ if(!modal){
+  modal=document.createElement('div');modal.id='dashboard-village-modal';modal.className='modal-backdrop';document.body.appendChild(modal);
+  modal.addEventListener('click',event=>{
+   const edit=event.target.closest('button[data-village-edit-stage]');
+   if(edit){editDashboardVillageRecord(Number(edit.dataset.villageEditStage),edit.dataset.villageRecordId);return;}
+   if(event.target===modal||event.target.closest('[data-village-close]'))closeDashboardVillage();
+  });
+  modal.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeDashboardVillage();}});
+ }
+ modal.innerHTML=dashboardVillageDialogMarkup(tambon,moo);modal.style.display='flex';
+ modal.querySelector('[data-village-close]')?.focus();
+}
+function closeDashboardVillage() {
+ const modal=document.getElementById('dashboard-village-modal');if(modal)modal.style.display='none';
+ state.dashboardVillageSelection=null;
+ const body=document.getElementById('dash-resp-by-moo-body');
+ body?.querySelector('button[data-village-open]')?.focus();
+}
+function editDashboardVillageRecord(stage,id) {
+ if(!state.currentUser||!state.cloudToken||!state.dataLoaded)return false;
+ if(stage!==1&&stage!==2)return false;
+ const s=state.dashboardVillageSelection;if(!s)return false;
+ // Revalidate against this village and year before opening an existing person's form.
+ if(!dashboardVillageRecords(s.tambon,s.moo).some(item=>item.stage===stage&&String(item.record.id)===String(id)))return false;
+ closeDashboardVillage();
+ if(stage===1)openRespondentModal(id);else openEnvAs02Modal(id);
+ return true;
+}
+function bindDashboardVillageLinks() {
+ const body=document.getElementById('dash-resp-by-moo-body');if(!body||body.dataset.villageLinksBound)return;
+ body.dataset.villageLinksBound='true';
+ const activate=event=>{
+  const row=event.target.closest('tr[data-village-tambon]');if(!row)return;
+  if(event.type==='keydown'){
+   if(event.target!==row||!['Enter',' '].includes(event.key))return;
+   event.preventDefault();
+  }
+  openDashboardVillage(row.dataset.villageTambon,row.dataset.villageMoo);
+ };
+ body.addEventListener('click',activate);body.addEventListener('keydown',activate);
+}
+window.addEventListener('DOMContentLoaded',bindDashboardVillageLinks);
+
+function dashboardRiskSummary(rows,stage) {
+ const levels=['ต่ำ','ปานกลาง','มาก'];
+ const unknown=rows.filter(r=>!levels.includes(r.risk_level));
+ const groups=levels.map(level=>({level,rows:rows.filter(r=>r.risk_level===level)}));
+ if(unknown.length)groups.push({level:'ยังไม่ระบุ',rows:unknown});
+ const counts=group=>['ท่าตอน','แม่นาวาง'].map(area=>group.filter(r=>dashboardGroupLabel(r.tambon)===area).length);
+ const cell=(value,high)=>`<td>${high?'<span class="dashboard-risk-high">'+esc(value)+'</span>':esc(value)}</td>`;
+ const body=groups.map(({level,rows:group})=>{
+  const high=level==='มาก',values=counts(group);
+  const cells=stage===1?[level,level==='ยังไม่ระบุ'?'ยังไม่มีผลประเมิน':'ตามต้นฉบับ',...values,group.length,level==='ยังไม่ระบุ'?'ตรวจสอบข้อมูลรายบุคคล':'ติดตามตามผลประเมินต้นฉบับ']:[`ความเสี่ยง${level} (เก็บแม่อาย ${state.fiscalYear})`,...values,group.length];
+  return `<tr data-risk="${high?'high':level==='ปานกลาง'?'medium':level==='ต่ำ'?'low':'unknown'}">${cells.map(value=>cell(value,high)).join('')}</tr>`;
+ }).join('');
+ const totals=counts(rows),other=rows.length-totals[0]-totals[1];
+ const foot=`<tr class="dashboard-total-row"><th scope="row">รวมทั้งหมด</th>${stage===1?'<td>ทุกระดับความเสี่ยง</td>':''}${totals.map(n=>`<td data-summary-count>${n}</td>`).join('')}<td data-summary-count>${rows.length}</td>${stage===1?'<td>แบบประเมิน AS-01</td>':''}</tr>`;
+ return {body,foot,other};
+}
+
 function renderExecutiveDashboard() {
  const wells=state.wells,a=yearRows(state.respondents),b=yearRows(state.envAs02,2);
  setHtml('chart-well-types',bars(['บ่อน้ำตื้น','บ่อบาดาล','ประปาภูเขา'].map(k=>[k,wells.filter(x=>x.well_type===k).length]),wells.length));
@@ -2391,9 +2472,10 @@ function renderExecutiveDashboard() {
  const hcs=[...new Set(wells.map(w=>w.health_center||'ไม่ระบุ'))];
  setHtml('chart-well-hc',bars(hcs.map(h=>[h,wells.filter(w=>(w.health_center||'ไม่ระบุ')===h).length]),wells.length));
  setHtml('chart-resp-tab1-risk',riskBars(a));setHtml('chart-resp-tab2-risk',riskBars(b));
- const counts=(rows)=>['ต่ำ','ปานกลาง','มาก'].map(k=>rows.filter(x=>x.risk_level===k).length);
- setHtml('dash-risk-matrix-tab1-body',['ต่ำ','ปานกลาง','มาก'].map(k=>`<tr><td>${k}</td><td>ตามต้นฉบับ</td><td>${a.filter(x=>x.risk_level===k&&x.tambon==='ท่าตอน').length}</td><td>${a.filter(x=>x.risk_level===k&&x.tambon==='แม่นาวาง').length}</td><td>${a.filter(x=>x.risk_level===k).length}</td><td>ติดตามตามผลประเมินต้นฉบับ</td></tr>`).join(''));
- setHtml('dash-pivot-tab2-body',['ต่ำ','ปานกลาง','มาก'].map(k=>`<tr><td>ความเสี่ยง${k} (เก็บแม่อาย ${state.fiscalYear})</td><td>${b.filter(x=>x.risk_level===k&&x.tambon==='ท่าตอน').length}</td><td>${b.filter(x=>x.risk_level===k&&x.tambon==='แม่นาวาง').length}</td><td>${b.filter(x=>x.risk_level===k).length}</td></tr>`).join('')+`<tr><td>รวมกลุ่ม Env-As-02 / เก็บปัสสาวะ</td><td colspan="3">${b.length} รายการ</td></tr>`);
+ const summaryA=dashboardRiskSummary(a,1),summaryB=dashboardRiskSummary(b,2);
+ setHtml('dash-risk-matrix-tab1-body',summaryA.body);setHtml('dash-risk-matrix-tab1-foot',summaryA.foot);
+ setHtml('dash-pivot-tab2-body',summaryB.body);setHtml('dash-pivot-tab2-foot',summaryB.foot);
+ for(const [stage,result] of [[1,summaryA],[2,summaryB]]){const note=document.getElementById('dashboard-summary-area-note-'+stage);if(note){note.hidden=!result.other;note.textContent=`ยอดรวมมีรายการพื้นที่อื่นหรือยังไม่ระบุตำบล ${result.other} ราย`;}}
  const area=r=>dashboardGroupLabel(r.tambon),hcOf=r=>dashboardGroupLabel(r.health_center);
  const areas=['ท่าตอน','แม่นาวาง',...[...new Set([...a,...b].map(area))].filter(t=>!['ท่าตอน','แม่นาวาง'].includes(t))];
  setHtml('dash-resp-by-tambon-body',areas.map(t=>{const aa=a.filter(r=>area(r)===t),bb=b.filter(r=>area(r)===t);return `<tr><td>${esc(t)}</td>${dashboardStageCountCells(aa,bb)}</tr>`;}).join(''));
@@ -2403,8 +2485,11 @@ function renderExecutiveDashboard() {
  setHtml('dash-resp-by-hc-foot',dashboardTotalRow(a,b,2));
  const villageKey=r=>JSON.stringify([area(r),dashboardGroupLabel(r.moo)]);
  const keys=[...new Set([...a,...b].map(villageKey))].sort((x,y)=>x.localeCompare(y,'th',{numeric:true}));
- setHtml('dash-resp-by-moo-body',keys.map(k=>{const aa=a.filter(r=>villageKey(r)===k),bb=b.filter(r=>villageKey(r)===k);const [t,m]=JSON.parse(k);const known=aa.filter(r=>historyValuePresent(r.exposure_years));const hc=[...new Set([...aa,...bb].map(hcOf))].join(', ')||'ไม่ระบุ';return `<tr><td>${esc(t)}</td><td>${esc(m)}</td><td>${esc(hc)}</td>${dashboardStageCountCells(aa,bb)}<td>${known.length?'ระบุ '+known.length+'/'+aa.length+' ราย':'ยังไม่มีข้อมูล'}</td></tr>`;}).join('')||'<tr><td colspan="12">ไม่มีข้อมูลในปีงบประมาณที่เลือก</td></tr>');
+ setHtml('dash-resp-by-moo-body',keys.map(k=>{const aa=a.filter(r=>villageKey(r)===k),bb=b.filter(r=>villageKey(r)===k);const [t,m]=JSON.parse(k);const known=aa.filter(r=>historyValuePresent(r.exposure_years));const hc=[...new Set([...aa,...bb].map(hcOf))].join(', ')||'ไม่ระบุ';return `<tr class="dashboard-village-row" tabindex="0" data-village-tambon="${esc(t)}" data-village-moo="${esc(m)}" aria-label="ดูรายชื่อ ต.${esc(t)} หมู่ ${esc(m)}"><td>${esc(t)}<br><button type="button" class="btn btn-sm btn-outline dashboard-village-open" data-village-open aria-label="ดูรายชื่อ ต.${esc(t)} หมู่ ${esc(m)}">ดูรายชื่อ</button></td><td>${esc(m)}</td><td>${esc(hc)}</td>${dashboardStageCountCells(aa,bb)}<td>${known.length?'ระบุ '+known.length+'/'+aa.length+' ราย':'ยังไม่มีข้อมูล'}</td></tr>`;}).join('')||'<tr><td colspan="12">ไม่มีข้อมูลในปีงบประมาณที่เลือก</td></tr>');
  setHtml('dash-resp-by-moo-foot',dashboardTotalRow(a,b,3,true));
+ const villageModal=document.getElementById('dashboard-village-modal');
+ if(villageModal?.style.display==='flex'&&state.dashboardVillageSelection){const v=state.dashboardVillageSelection;villageModal.innerHTML=dashboardVillageDialogMarkup(v.tambon,v.moo);}
+
  const unknown=rows=>rows.filter(r=>!['ต่ำ','ปานกลาง','มาก'].includes(r.risk_level)).length;
  const unknownA=unknown(a),unknownB=unknown(b),note=document.getElementById('dashboard-risk-missing-note');
  if(note){note.hidden=!unknownA&&!unknownB;note.textContent=`รายการที่ยังไม่ระบุระดับความเสี่ยง: AS-01 ${unknownA} ราย, AS-02 ${unknownB} ราย (นับรวมในคอลัมน์รวมแล้ว)`;}

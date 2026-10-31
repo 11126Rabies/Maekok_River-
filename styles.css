@@ -1492,3 +1492,13 @@ h1, h2, h3, h4, .nav-tab, .btn {
 .stage-comparison tfoot .dashboard-stage-as02 {background:#dcfce7;color:#14532d;}
 .stage-comparison tfoot .dashboard-stage-as02[data-count-kind="total"] {border-left:2px solid #cbd5e1;}
 #dashboard-risk-missing-note {margin-top:8px;}
+
+/* Risk summary text only; retain the existing table backgrounds. */
+.risk-summary-table .dashboard-risk-high,.dashboard-village-dialog .dashboard-risk-high {color:#b91c1c;font-weight:800;}
+.dashboard-village-dialog .dashboard-risk-medium {color:#b45309;font-weight:600;}
+.risk-summary-table tfoot th,.risk-summary-table tfoot td {border-top:2px solid #64748b;font-weight:700;}
+.dashboard-village-row {cursor:pointer;}
+.dashboard-village-row:focus-visible {outline:3px solid #0284c7;outline-offset:-3px;}
+.dashboard-village-open {margin-top:4px;font-size:11px;padding:3px 6px;}
+.dashboard-village-dialog .table-responsive {max-height:60vh;}
+.dashboard-village-list th,.dashboard-village-list td {white-space:normal;}
