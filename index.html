@@ -1482,8 +1482,9 @@
             <h4><i class="fa-solid fa-link"></i> ข้อมูลการสำรวจ, เลขที่แบบคัดกรอง & การเชื่อมโยงจุดบ่อน้ำ (147 บ่อ)</h4>
             <div class="form-grid-4">
               <div class="form-group">
-                <label>เลขที่แบบคัดกรอง / รหัส (Code) *</label>
-                <input type="text" id="resp-code" required placeholder="เช่น NM081, OCM011, GEN154" />
+                <label for="resp-code">เลขที่แบบคัดกรอง / รหัส (Code) *</label>
+                <input type="text" id="resp-code" required aria-describedby="resp-code-hint" placeholder="เช่น NM081, OCM011, GEN154" />
+                <small id="resp-code-hint" class="form-number-hint">แก้ไขรหัสได้ โดยประวัติและข้อมูลของรายการเดิมยังคงอยู่</small>
               </div>
               <div class="form-group">
                 <label>วันที่ลงสำรวจ / สัมภาษณ์ *</label>
@@ -1509,10 +1510,11 @@
             </div>
             <div class="form-grid-3">
               <div class="form-group">
-                <label>เชื่อมโยงจุดบ่อน้ำที่ใช้ประจำ *</label>
-                <select id="resp-well-id" onchange="syncCoordinatesFromSelectedWell()">
-                  <option value="">-- เลือกจุดบ่อน้ำในหมู่บ้าน --</option>
+                <label for="resp-well-id">เชื่อมโยงจุดบ่อน้ำที่ใช้ประจำ (ไม่บังคับ)</label>
+                <select id="resp-well-id" aria-describedby="resp-well-link-hint" onchange="syncCoordinatesFromSelectedWell()">
+                  <option value="">ไม่มี / ยังไม่เชื่อมโยง (เพิ่มภายหลังได้)</option>
                 </select>
+                <small id="resp-well-link-hint" class="form-number-hint">หากยังไม่มีข้อมูลบ่อน้ำ ให้เลือก “ไม่มี / ยังไม่เชื่อมโยง” แล้วกลับมาแก้ไขภายหลังได้</small>
               </div>
               <div class="form-group">
                 <label>รพ.สต. ที่รับผิดชอบ</label>
@@ -1953,8 +1955,9 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>จุดบ่อน้ำที่เชื่อมโยง</label>
-                <input type="text" id="as02-well-id" placeholder="เช่น W001-P1" />
+                <label for="as02-well-id">จุดบ่อน้ำที่เชื่อมโยง (ไม่บังคับ)</label>
+                <select id="as02-well-id" aria-describedby="as02-well-link-hint"><option value="">ไม่มี / ยังไม่เชื่อมโยง (เพิ่มภายหลังได้)</option></select>
+                <small id="as02-well-link-hint" class="form-number-hint">เลือกจากทะเบียนแหล่งน้ำ หรือเลือก “ไม่มี / ยังไม่เชื่อมโยง” เพื่อเพิ่มภายหลัง</small>
               </div>
             </div>
           </div>
@@ -2734,6 +2737,6 @@
   <!-- Main Application Logic -->
   <script src="water-history.js?v=online-20261031"></script>
   <script src="import-templates.js?v=online-20261031"></script>
-  <script src="app.js?v=village-summary-20261031"></script>
+  <script src="app.js?v=form-links-codes-20261031"></script>
 </body>
 </html>

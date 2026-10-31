@@ -919,6 +919,7 @@ function openEnvAs02ForRespondent(respId) {
 }
 
 function openDetailedEnvAs02(id = null) {
+  populateWellDropdowns();
   populateAs02RespondentDropdown();
   const modal = document.getElementById('env-as02-modal');
   const title = document.getElementById('as02-modal-title');
@@ -1107,6 +1108,20 @@ function filterWellByHcClick(hcName) {
   renderWellsTable();
 }
 
+// Optional well links use the existing empty well_id value, so they can be filled later.
+function screeningWellOptions() {
+ return state.wells.map(w=>`<option value="${esc(w.well_id)}">[${esc(w.well_id)}${w.sample_code?' / '+esc(w.sample_code):''}] ${esc(w.well_name||w.owner_name||'ไม่ระบุชื่อ')} (ม.${esc(w.moo??'ไม่ระบุ')} ต.${esc(w.tambon||'ไม่ระบุ')})</option>`).join('');
+}
+function populateScreeningWellSelect(id,selected) {
+ const select=document.getElementById(id);if(!select)return;
+ const value=String(selected??select.value??'').trim();
+ select.required=false;
+ select.innerHTML='<option value="">ไม่มี / ยังไม่เชื่อมโยง (เพิ่มภายหลังได้)</option>'+screeningWellOptions();
+ // Preserve a recorded ID when it is not currently in the registry; do not silently erase it.
+ if(value&&!state.wells.some(w=>String(w.well_id)===value))select.insertAdjacentHTML('beforeend',`<option value="${esc(value)}">[${esc(value)}] รหัสเดิม — ยังไม่พบในทะเบียนแหล่งน้ำ</option>`);
+ select.value=value;
+}
+
 function populateWellDropdowns() {
   const mapWellSel = document.getElementById('map-filter-well');
   const respFilterWellSel = document.getElementById('resp-filter-well');
@@ -1120,9 +1135,7 @@ function populateWellDropdowns() {
   const currentLabFilterVal = labFilterWellSel ? labFilterWellSel.value : 'ALL';
   const currentLabModalVal = labModalWellSel ? labModalWellSel.value : '';
 
-  const optionsHtml = state.wells.map(w =>
-    `<option value="${w.well_id}">[${w.well_id}${w.sample_code ? ' / ' + w.sample_code : ''}] ${w.well_name} (ม.${w.moo} ต.${w.tambon})</option>`
-  ).join('');
+  const optionsHtml = screeningWellOptions();
 
   if (mapWellSel) {
     mapWellSel.innerHTML = `<option value="ALL">-- ทุกจุดบ่อน้ำ (${state.wells.length} บ่อ) --</option>` + optionsHtml;
@@ -1132,10 +1145,8 @@ function populateWellDropdowns() {
     respFilterWellSel.innerHTML = `<option value="ALL">ทุกจุดบ่อน้ำ (${state.wells.length} บ่อ)</option>` + optionsHtml;
     respFilterWellSel.value = currentRespFilterVal;
   }
-  if (modalWellSel) {
-    modalWellSel.innerHTML = `<option value="">-- เลือกจุดบ่อน้ำในหมู่บ้าน --</option>` + optionsHtml;
-    modalWellSel.value = currentModalVal;
-  }
+  populateScreeningWellSelect('resp-well-id',currentModalVal);
+  populateScreeningWellSelect('as02-well-id');
   if (labFilterWellSel) {
     labFilterWellSel.innerHTML = `<option value="ALL">ทุกจุดบ่อน้ำ (${state.wells.length} บ่อ)</option>` + optionsHtml;
     labFilterWellSel.value = currentLabFilterVal;
@@ -2265,7 +2276,7 @@ function sortedWaterLabs(rows) {
 
 // Source-grounded calculations, 2569 revision. Historical source rows remain separate by stage.
 const DATA_VERSION = 'MAEAI_FISCAL_20261030_V2';
-const RELEASE_VERSION = '2026-10-31-village-summary';
+const RELEASE_VERSION = '2026-10-31-form-links-codes';
 const ONLINE_API_REVISION = 'MAEAI_ONLINE_20261031';
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function setText(id, value) { const el=document.getElementById(id); if(el) el.textContent=value; }
@@ -2977,6 +2988,7 @@ function detailedOtherBase(prefix,suffix) {
 function setDetailedField(prefix,suffix,value) {
  const el=document.getElementById(prefix+'-'+suffix);if(!el)return;
  const text=value??'';
+ if(suffix==='well-id'&&['resp','as02'].includes(prefix)){populateScreeningWellSelect(prefix+'-well-id',text);return;}
  if(el.tagName==='SELECT'){
   if(!Array.from(el.options).some(o=>o.value===''))el.insertAdjacentHTML('afterbegin','<option value="">-- ยังไม่ระบุ --</option>');
   // Match original options regardless of a legacy numeric prefix; keep all other values verbatim.
@@ -3024,9 +3036,9 @@ recalcScore = function() {
 };
 function setAS02FormNumberRequirement(isEditing) {
  const input=document.getElementById('as02-form-no');
- if(input)input.required=!isEditing;
+ if(input){input.required=!isEditing;input.readOnly=false;input.disabled=false;}
  setText('as02-form-no-label',isEditing?'เลขที่แบบฟอร์ม Env-As-02 (ไม่บังคับเมื่อแก้ไข)':'เลขที่แบบฟอร์ม Env-As-02 *');
- setText('as02-form-no-hint',isEditing?'เว้นว่างได้ ระบบแก้ไขรายการเดิมด้วยรหัสรายการ ไม่เพิ่มเป็นรายใหม่':'เพิ่มรายการใหม่ต้องระบุเลขที่แบบฟอร์ม');
+ setText('as02-form-no-hint',isEditing?'แก้ไขเลขที่แบบฟอร์มได้ หรือเว้นว่างหากยังไม่มีเลข โดยคงข้อมูลรายการเดิมไว้':'เพิ่มรายการใหม่ต้องระบุเลขที่แบบฟอร์ม สามารถแก้เลขที่ได้');
 }
 function openRestoredScreeningForm(stage,id) {
  state.detailedScreening=null;
@@ -3034,6 +3046,8 @@ function openRestoredScreeningForm(stage,id) {
  const existing=rows.find(r=>r.id===id);if(id&&!existing)return;
  if(stage===2)openDetailedEnvAs02(id);else openDetailedRespondentModal(id);
  const prefix=stage===2?'as02':'resp',form=document.getElementById(stage===2?'env-as02-form':'respondent-form');
+ const editableCode=document.getElementById(stage===2?'as02-form-no':'resp-code');
+ if(editableCode){editableCode.readOnly=false;editableCode.disabled=false;}
  const seq=Math.max(0,...rows.map(r=>Number(r.seq)||0))+1;
  const year=fiscalYearFromDate(bangkokToday());
  const record=existing||{id:`MANUAL-${stage}-${Date.now()}`,seq,code:stage===1?`NM${String(seq).padStart(3,'0')}`:'',
@@ -3106,6 +3120,7 @@ function collectRestoredScreeningRecord(stage) {
 }
 async function saveRestoredScreeningForm(e,stage) {
  e.preventDefault();
+ if(stage===1&&!getDetailedField('resp','code')){alert('กรุณาระบุเลขที่แบบคัดกรอง / รหัส (Code)');return;}
  if(stage===2&&!state.detailedScreening.existing&&!getDetailedField('as02','form-no')){alert('กรุณาระบุเลขที่แบบฟอร์มสำหรับรายการใหม่');return;}
  if(stage===1&&state.detailedScreening.changedAnswers.size&&!document.getElementById('as01-assessment-complete').checked){
   alert('กรุณายืนยันว่าประเมินครบทั้ง 11 ข้อแล้ว ก่อนบันทึกคำตอบและคำนวณคะแนนใหม่');return;
