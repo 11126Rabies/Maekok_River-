@@ -2265,7 +2265,7 @@ function sortedWaterLabs(rows) {
 
 // Source-grounded calculations, 2569 revision. Historical source rows remain separate by stage.
 const DATA_VERSION = 'MAEAI_FISCAL_20261030_V2';
-const RELEASE_VERSION = '2026-10-31-online-auth';
+const RELEASE_VERSION = '2026-10-31-dashboard-totals';
 const ONLINE_API_REVISION = 'MAEAI_ONLINE_20261031';
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function setText(id, value) { const el=document.getElementById(id); if(el) el.textContent=value; }
@@ -2369,6 +2369,21 @@ function updateKpiCards() {
  setText('dash-tab1-total',a.length);setText('dash-tab2-total',b.length);setText('screening-risk-caption',['ต่ำ','ปานกลาง','มาก'].map(k=>`${k} ${a.filter(x=>x.risk_level===k).length} ราย`).join(' | '));
  setText('dynamic-source-notice',`ปีงบประมาณ ${state.fiscalYear}: Env-As-01 ${a.length} ราย → Env-As-02/เก็บปัสสาวะ ${b.length} ราย เป็นการติดตาม ไม่บวกเป็นจำนวนคนใหม่`);
 }
+// Both stages retain their own totals; follow-up records are never added to AS-01 totals.
+function dashboardGroupLabel(value) {return String(value??'').trim()||'ไม่ระบุ';}
+function dashboardRiskCounts(rows) {return ['ต่ำ','ปานกลาง','มาก'].map(level=>rows.filter(r=>r.risk_level===level).length);}
+function dashboardStageCountCells(as01,as02) {
+ return [[as01,'as01'],[as02,'as02']].map(([rows,stage])=>{
+  const values=[rows.length,...dashboardRiskCounts(rows)];
+  return values.map((value,i)=>`<td class="dashboard-stage-${stage}" data-stage="${stage}" data-count-kind="${['total','low','medium','high'][i]}"><span${i===2?' class="dashboard-risk-medium"':i===3?' class="dashboard-risk-high"':''}>${value}</span></td>`).join('');
+ }).join('');
+}
+function dashboardTotalRow(as01,as02,groupColumns,withExposure=false) {
+ const labels=['ทุกหมู่บ้าน','ทุก รพ.สต.'];
+ const extra=Array.from({length:groupColumns-1},(_,i)=>`<td>${groupColumns===2?'ทุกพื้นที่':labels[i]}</td>`).join('');
+ const known=as01.filter(r=>historyValuePresent(r.exposure_years)).length;
+ return `<tr class="dashboard-total-row"><th scope="row">รวมทั้งหมด</th>${extra}${dashboardStageCountCells(as01,as02)}${withExposure?`<td>ระบุ ${known}/${as01.length} ราย</td>`:''}</tr>`;
+}
 function renderExecutiveDashboard() {
  const wells=state.wells,a=yearRows(state.respondents),b=yearRows(state.envAs02,2);
  setHtml('chart-well-types',bars(['บ่อน้ำตื้น','บ่อบาดาล','ประปาภูเขา'].map(k=>[k,wells.filter(x=>x.well_type===k).length]),wells.length));
@@ -2379,12 +2394,20 @@ function renderExecutiveDashboard() {
  const counts=(rows)=>['ต่ำ','ปานกลาง','มาก'].map(k=>rows.filter(x=>x.risk_level===k).length);
  setHtml('dash-risk-matrix-tab1-body',['ต่ำ','ปานกลาง','มาก'].map(k=>`<tr><td>${k}</td><td>ตามต้นฉบับ</td><td>${a.filter(x=>x.risk_level===k&&x.tambon==='ท่าตอน').length}</td><td>${a.filter(x=>x.risk_level===k&&x.tambon==='แม่นาวาง').length}</td><td>${a.filter(x=>x.risk_level===k).length}</td><td>ติดตามตามผลประเมินต้นฉบับ</td></tr>`).join(''));
  setHtml('dash-pivot-tab2-body',['ต่ำ','ปานกลาง','มาก'].map(k=>`<tr><td>ความเสี่ยง${k} (เก็บแม่อาย ${state.fiscalYear})</td><td>${b.filter(x=>x.risk_level===k&&x.tambon==='ท่าตอน').length}</td><td>${b.filter(x=>x.risk_level===k&&x.tambon==='แม่นาวาง').length}</td><td>${b.filter(x=>x.risk_level===k).length}</td></tr>`).join('')+`<tr><td>รวมกลุ่ม Env-As-02 / เก็บปัสสาวะ</td><td colspan="3">${b.length} รายการ</td></tr>`);
- const areas=['ท่าตอน','แม่นาวาง',...[...new Set([...a,...b].map(x=>x.tambon))].filter(t=>t&&!['ท่าตอน','แม่นาวาง'].includes(t))];
- setHtml('dash-resp-by-tambon-body',areas.map(t=>{const aa=a.filter(x=>x.tambon===t),bb=b.filter(x=>x.tambon===t);return `<tr><td>${esc(t)}</td>${[aa.length,...counts(aa),bb.length,...counts(bb)].map(v=>`<td>${v}</td>`).join('')}</tr>`;}).join(''));
- const healthCenters=[...new Set([...a,...b].map(r=>r.health_center||'ไม่ระบุ'))];
- setHtml('dash-resp-by-hc-body',healthCenters.map(h=>{const aa=a.filter(r=>(r.health_center||'ไม่ระบุ')===h),bb=b.filter(r=>(r.health_center||'ไม่ระบุ')===h);return `<tr><td>${esc(h)}</td><td>${esc([...new Set([...aa,...bb].map(r=>r.tambon).filter(Boolean))].join(', '))}</td>${[aa.length,...counts(aa),bb.length,...counts(bb)].map(v=>`<td>${v}</td>`).join('')}</tr>`;}).join(''));
- const keys=[...new Set([...a,...b].map(x=>x.tambon+'|'+x.moo))].sort((x,y)=>x.localeCompare(y,'th',{numeric:true}));
- setHtml('dash-resp-by-moo-body',keys.map(k=>{const aa=a.filter(x=>x.tambon+'|'+x.moo===k),bb=b.filter(x=>x.tambon+'|'+x.moo===k);const [t,m]=k.split('|');const known=aa.filter(r=>historyValuePresent(r.exposure_years));const hc=[...new Set([...aa,...bb].map(r=>r.health_center).filter(Boolean))].join(', ')||'ไม่ระบุ';return `<tr><td>${esc(t)}</td><td>${esc(m)}</td><td>${esc(hc)}</td>${[aa.length,...counts(aa),bb.length,...counts(bb)].map(v=>`<td>${v}</td>`).join('')}<td>${known.length?'ระบุ '+known.length+'/'+aa.length+' ราย':'ยังไม่มีข้อมูล'}</td></tr>`;}).join(''));
+ const area=r=>dashboardGroupLabel(r.tambon),hcOf=r=>dashboardGroupLabel(r.health_center);
+ const areas=['ท่าตอน','แม่นาวาง',...[...new Set([...a,...b].map(area))].filter(t=>!['ท่าตอน','แม่นาวาง'].includes(t))];
+ setHtml('dash-resp-by-tambon-body',areas.map(t=>{const aa=a.filter(r=>area(r)===t),bb=b.filter(r=>area(r)===t);return `<tr><td>${esc(t)}</td>${dashboardStageCountCells(aa,bb)}</tr>`;}).join(''));
+ setHtml('dash-resp-by-tambon-foot',dashboardTotalRow(a,b,1));
+ const healthCenters=[...new Set([...a,...b].map(hcOf))];
+ setHtml('dash-resp-by-hc-body',healthCenters.map(h=>{const aa=a.filter(r=>hcOf(r)===h),bb=b.filter(r=>hcOf(r)===h);return `<tr><td>${esc(h)}</td><td>${esc([...new Set([...aa,...bb].map(area))].join(', '))}</td>${dashboardStageCountCells(aa,bb)}</tr>`;}).join('')||'<tr><td colspan="10">ไม่มีข้อมูลในปีงบประมาณที่เลือก</td></tr>');
+ setHtml('dash-resp-by-hc-foot',dashboardTotalRow(a,b,2));
+ const villageKey=r=>JSON.stringify([area(r),dashboardGroupLabel(r.moo)]);
+ const keys=[...new Set([...a,...b].map(villageKey))].sort((x,y)=>x.localeCompare(y,'th',{numeric:true}));
+ setHtml('dash-resp-by-moo-body',keys.map(k=>{const aa=a.filter(r=>villageKey(r)===k),bb=b.filter(r=>villageKey(r)===k);const [t,m]=JSON.parse(k);const known=aa.filter(r=>historyValuePresent(r.exposure_years));const hc=[...new Set([...aa,...bb].map(hcOf))].join(', ')||'ไม่ระบุ';return `<tr><td>${esc(t)}</td><td>${esc(m)}</td><td>${esc(hc)}</td>${dashboardStageCountCells(aa,bb)}<td>${known.length?'ระบุ '+known.length+'/'+aa.length+' ราย':'ยังไม่มีข้อมูล'}</td></tr>`;}).join('')||'<tr><td colspan="12">ไม่มีข้อมูลในปีงบประมาณที่เลือก</td></tr>');
+ setHtml('dash-resp-by-moo-foot',dashboardTotalRow(a,b,3,true));
+ const unknown=rows=>rows.filter(r=>!['ต่ำ','ปานกลาง','มาก'].includes(r.risk_level)).length;
+ const unknownA=unknown(a),unknownB=unknown(b),note=document.getElementById('dashboard-risk-missing-note');
+ if(note){note.hidden=!unknownA&&!unknownB;note.textContent=`รายการที่ยังไม่ระบุระดับความเสี่ยง: AS-01 ${unknownA} ราย, AS-02 ${unknownB} ราย (นับรวมในคอลัมน์รวมแล้ว)`;}
  const wk=[...new Set(wells.map(x=>x.tambon+'|'+x.moo))].sort();
  setHtml('dash-moo-breakdown-body',wk.map(k=>{const group=wells.filter(x=>x.tambon+'|'+x.moo===k),known=group.filter(x=>x.user_count!==null),sum=known.reduce((v,x)=>v+x.user_count,0);const [t,m]=k.split('|');return `<tr><td>${esc(t)}</td><td>${esc(m)}</td>${['บ่อน้ำตื้น','บ่อบาดาล','ประปาภูเขา'].map(type=>`<td>${group.filter(x=>x.well_type===type).length}</td>`).join('')}<td>${group.length}</td><td>${group.filter(x=>x.sample_code).length}</td><td>${sum} คน (ระบุ ${known.length}/${group.length} แห่ง)</td></tr>`;}).join(''));
  const screened=a.filter(x=>x.status_2q&&x.status_2q!=='ยังไม่คัดกรอง');

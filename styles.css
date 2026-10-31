@@ -1483,3 +1483,12 @@ h1, h2, h3, h4, .nav-tab, .btn {
 #login-connection-status{font-size:13px;color:#475569;}
 .pending-cloud-notice{position:sticky;top:0;z-index:900;background:#fff7ed;border:2px solid #f59e0b;padding:12px;}
 .pending-cloud-notice[hidden]{display:none;}
+
+/* Fiscal-year totals and risk text in the three stage comparison tables. */
+.stage-comparison .dashboard-risk-high {color:#b91c1c;font-weight:800;}
+.stage-comparison .dashboard-risk-medium {color:#b45309;font-weight:600;}
+.stage-comparison tfoot th,.stage-comparison tfoot td {border-top:2px solid #64748b;background:#e2e8f0;color:#0f172a;font-weight:700;white-space:nowrap;}
+.stage-comparison tfoot .dashboard-stage-as01 {background:#dbeafe;color:#1e3a8a;}
+.stage-comparison tfoot .dashboard-stage-as02 {background:#dcfce7;color:#14532d;}
+.stage-comparison tfoot .dashboard-stage-as02[data-count-kind="total"] {border-left:2px solid #cbd5e1;}
+#dashboard-risk-missing-note {margin-top:8px;}

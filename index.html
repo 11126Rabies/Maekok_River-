@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="styles.css?v=online-20261031" />
+  <link rel="stylesheet" href="styles.css?v=dashboard-totals-20261031" />
 </head>
 <body>
 
@@ -287,8 +287,9 @@
               </h4>
               <div class="table-responsive">
                 <table id="dashboard-tambon-table" class="data-table compact-table stage-comparison">
-                  <thead><tr><th rowspan="2">ตำบล</th><th colspan="4" class="hc-stage-as01">ผลคัดกรอง Env-As-01</th><th colspan="4" class="hc-stage-as02">ติดตาม / เก็บปัสสาวะ Env-As-02</th></tr><tr><th class="hc-stage-as01">รวม (ราย)</th><th class="hc-stage-as01">ต่ำ</th><th class="hc-stage-as01">ปานกลาง</th><th class="hc-stage-as01">มาก</th><th class="hc-stage-as02">รวม (ราย)</th><th class="hc-stage-as02">ต่ำ</th><th class="hc-stage-as02">ปานกลาง</th><th class="hc-stage-as02">มาก</th></tr></thead>
+                  <thead><tr><th rowspan="2">ตำบล</th><th colspan="4" class="hc-stage-as01">ผลคัดกรอง Env-As-01</th><th colspan="4" class="hc-stage-as02">ติดตาม / เก็บปัสสาวะ Env-As-02</th></tr><tr><th class="hc-stage-as01">รวม (ราย)</th><th class="hc-stage-as01">ต่ำ</th><th class="hc-stage-as01"><span class="dashboard-risk-medium">ปานกลาง</span></th><th class="hc-stage-as01"><span class="dashboard-risk-high">มาก</span></th><th class="hc-stage-as02">รวม (ราย)</th><th class="hc-stage-as02">ต่ำ</th><th class="hc-stage-as02"><span class="dashboard-risk-medium">ปานกลาง</span></th><th class="hc-stage-as02"><span class="dashboard-risk-high">มาก</span></th></tr></thead>
                   <tbody id="dash-resp-by-tambon-body"></tbody>
+                  <tfoot id="dash-resp-by-tambon-foot"></tfoot>
                 </table>
               </div>
             </div>
@@ -300,8 +301,9 @@
               </h4>
               <div class="table-responsive">
                 <table id="dashboard-hc-table" class="data-table compact-table stage-comparison">
-                  <thead><tr><th rowspan="2">รพ.สต.</th><th rowspan="2">พื้นที่</th><th colspan="4" class="hc-stage-as01">ผลคัดกรอง Env-As-01</th><th colspan="4" class="hc-stage-as02">ติดตาม / เก็บปัสสาวะ Env-As-02</th></tr><tr><th class="hc-stage-as01">รวม (ราย)</th><th class="hc-stage-as01">ต่ำ</th><th class="hc-stage-as01">ปานกลาง</th><th class="hc-stage-as01">มาก</th><th class="hc-stage-as02">รวม (ราย)</th><th class="hc-stage-as02">ต่ำ</th><th class="hc-stage-as02">ปานกลาง</th><th class="hc-stage-as02">มาก</th></tr></thead>
+                  <thead><tr><th rowspan="2">รพ.สต.</th><th rowspan="2">พื้นที่</th><th colspan="4" class="hc-stage-as01">ผลคัดกรอง Env-As-01</th><th colspan="4" class="hc-stage-as02">ติดตาม / เก็บปัสสาวะ Env-As-02</th></tr><tr><th class="hc-stage-as01">รวม (ราย)</th><th class="hc-stage-as01">ต่ำ</th><th class="hc-stage-as01"><span class="dashboard-risk-medium">ปานกลาง</span></th><th class="hc-stage-as01"><span class="dashboard-risk-high">มาก</span></th><th class="hc-stage-as02">รวม (ราย)</th><th class="hc-stage-as02">ต่ำ</th><th class="hc-stage-as02"><span class="dashboard-risk-medium">ปานกลาง</span></th><th class="hc-stage-as02"><span class="dashboard-risk-high">มาก</span></th></tr></thead>
                   <tbody id="dash-resp-by-hc-body"></tbody>
+                  <tfoot id="dash-resp-by-hc-foot"></tfoot>
                 </table>
               </div>
             </div>
@@ -317,10 +319,12 @@
             </div>
             <div class="table-responsive" style="max-height:360px;">
               <table id="dashboard-moo-table" class="data-table compact-table stage-comparison">
-                <thead><tr><th rowspan="2">ตำบล</th><th rowspan="2">หมู่ที่</th><th rowspan="2">รพ.สต.</th><th colspan="4" class="hc-stage-as01">ผลคัดกรอง Env-As-01</th><th colspan="4" class="hc-stage-as02">ติดตาม / เก็บปัสสาวะ Env-As-02</th><th rowspan="2">ข้อมูลระยะสัมผัส</th></tr><tr><th class="hc-stage-as01">รวม (ราย)</th><th class="hc-stage-as01">ต่ำ</th><th class="hc-stage-as01">ปานกลาง</th><th class="hc-stage-as01">มาก</th><th class="hc-stage-as02">รวม (ราย)</th><th class="hc-stage-as02">ต่ำ</th><th class="hc-stage-as02">ปานกลาง</th><th class="hc-stage-as02">มาก</th></tr></thead>
+                <thead><tr><th rowspan="2">ตำบล</th><th rowspan="2">หมู่ที่</th><th rowspan="2">รพ.สต.</th><th colspan="4" class="hc-stage-as01">ผลคัดกรอง Env-As-01</th><th colspan="4" class="hc-stage-as02">ติดตาม / เก็บปัสสาวะ Env-As-02</th><th rowspan="2">ข้อมูลระยะสัมผัส</th></tr><tr><th class="hc-stage-as01">รวม (ราย)</th><th class="hc-stage-as01">ต่ำ</th><th class="hc-stage-as01"><span class="dashboard-risk-medium">ปานกลาง</span></th><th class="hc-stage-as01"><span class="dashboard-risk-high">มาก</span></th><th class="hc-stage-as02">รวม (ราย)</th><th class="hc-stage-as02">ต่ำ</th><th class="hc-stage-as02"><span class="dashboard-risk-medium">ปานกลาง</span></th><th class="hc-stage-as02"><span class="dashboard-risk-high">มาก</span></th></tr></thead>
                 <tbody id="dash-resp-by-moo-body"></tbody>
+                  <tfoot id="dash-resp-by-moo-foot"></tfoot>
               </table>
             </div>
+            <p id="dashboard-risk-missing-note" class="data-note" hidden></p>
           </div>
         </div>
 
@@ -2726,6 +2730,6 @@
   <!-- Main Application Logic -->
   <script src="water-history.js?v=online-20261031"></script>
   <script src="import-templates.js?v=online-20261031"></script>
-  <script src="app.js?v=online-20261031"></script>
+  <script src="app.js?v=dashboard-totals-20261031"></script>
 </body>
 </html>
