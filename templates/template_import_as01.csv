@@ -1,0 +1,2 @@
+﻿code,full_name,age,gender,cid,house_no,moo,tambon,marital_status,education,years_in_area,risk_job_flag,risk_job_type,job_detail,job_duration,job_hours,disease_flag,diseases,symptom_flag,symptoms,q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,target_group,well_id,survey_date,interviewer_name,phone,exposure_years,health_center,amphoe,province,q2_1,q2_2,date_2q,assessor_2q,note_2q,fiscal_year,total_score,risk_level,notes
+EXAMPLE-AS01-001,บุคคลตัวอย่างสมมติหนึ่ง,45,ชาย,,99/1,1,ท่าตอน,,,,,,,,,,,,,1,1,0,0,0,0,0,0,0,0,0,,,2026-10-31,ผู้ประเมินตัวอย่าง,,10,,,,ไม่ใช่,ไม่ใช่,,,,,,,

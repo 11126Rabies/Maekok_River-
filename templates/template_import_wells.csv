@@ -1,0 +1,2 @@
+﻿well_id,sample_code,well_name,house_no,moo,tambon,well_type,depth_meters,utm_e,utm_n,latitude,longitude,distance_river_m,usage_type,user_count,health_center
+EXAMPLE-W001,EXAMPLE-P01,จุดน้ำตัวอย่างสมมติ,,1,ท่าตอน,บ่อน้ำตื้น,12,,,20.056,99.4,80,ใช้อุปโภค,4,รพ.สต.ตัวอย่าง

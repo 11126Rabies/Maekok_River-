@@ -822,6 +822,14 @@ h1, h2, h3, h4, .nav-tab, .btn {
 .modal-lg { max-width: 760px; }
 .modal-xl { max-width: 1040px; }
 
+/* Restore the roomy screening layouts shown in the reference screenshots. */
+#respondent-modal .modal-dialog,
+#env-as02-modal .modal-dialog {
+  max-width: 1480px;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+
 .modal-header {
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
@@ -1408,3 +1416,70 @@ h1, h2, h3, h4, .nav-tab, .btn {
 }
 
 
+
+.source-notice{background:#ecfdf5;border-bottom:1px solid #a7f3d0;padding:12px 24px;color:#065f46;line-height:1.6}.source-notice details{margin-top:4px;font-size:13px}.source-notice summary{cursor:pointer}.data-note{background:#f8fafc;border-left:3px solid #94a3b8;padding:10px;font-size:13px;color:#475569}.modal-dialog{max-height:92vh;overflow:auto}.modal-body input,.modal-body select{max-width:100%}@media(max-width:700px){.source-notice{padding:10px}.kpi-value{font-size:24px}.topbar-nav{overflow-x:auto}}
+
+/* Separate water-quality measurements into named columns. */
+.waterlab-wide-table { min-width: 3800px; }
+.waterlab-wide-table th { min-width: 125px; max-width: 210px; white-space: normal; }
+.waterlab-wide-table td { vertical-align: top; }
+.waterlab-wide-table td small { white-space: nowrap; }
+
+.fiscal-year-control { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#ffffff; color:#0f172a; border-radius:8px; flex-shrink:0; }
+.fiscal-year-control select { min-width:165px; padding:7px; border:1px solid #cbd5e1; border-radius:6px; }
+.registry-summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px; align-items:start; }
+.registry-summary-grid .pivot-summary-box { margin:0; min-width:0; overflow:auto; }
+.registry-summary-grid .table-responsive { max-height:320px; overflow:auto; }
+@media(max-width:1000px) { .registry-summary-grid { grid-template-columns:1fr; } }
+
+/* AS-02 questions 6 and 7 retain the established green check-card layout. */
+.water-source-card{border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;}
+.water-source-card:has(input[type=checkbox]:checked){border-color:#16a34a;background:#f0fdf4;}
+.water-source-choice{display:flex!important;align-items:flex-start;gap:6px;font-size:13px;line-height:1.5;cursor:pointer;}
+.water-source-choice input{width:16px!important;height:16px;flex-shrink:0;margin-top:3px;}
+.water-source-duration{display:flex!important;align-items:center;gap:6px;font-size:12px!important;margin:0!important;}
+.water-source-duration input{width:90px!important;min-width:0;padding:7px!important;}
+.water-source-duration input:disabled{background:#e2e8f0;color:#64748b;}
+.water-source-extra{margin-top:10px;display:block;font-size:12px;}
+.template-help{display:block;font-size:12px;margin-top:8px;color:#0f766e;}
+.release-downloads a{text-decoration:none;}
+@media(max-width:640px){.water-source-grid{grid-template-columns:1fr!important;}}
+/* Keep the added registry columns readable within the existing horizontal scroll. */
+#subview-as01 .data-table{min-width:1900px;}
+#subview-as02 .data-table{min-width:2400px;}
+#subview-as02 .data-table td:nth-child(3){min-width:170px;}
+#subview-as02 .data-table td:nth-child(13),#subview-as02 .data-table td:nth-child(14){min-width:280px;max-width:380px;line-height:1.6;}
+#tab-respondents .data-table{min-width:1750px;}
+
+.registry-cid { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.google-maps-link { display: inline-block; text-decoration: none; }
+
+.data-table thead th.hc-stage-as01 { background: #dbeafe; color: #1e3a8a; border-color: #93c5fd; }
+.data-table thead th.hc-stage-as02 { background: #dcfce7; color: #14532d; border-color: #86efac; }
+.data-table td.waterlab-point-name { min-width: 250px; max-width: 420px; white-space: normal; overflow-wrap: break-word; }
+
+/* Trial revision: abnormal lab results and complete stage columns. */
+.form-number-hint {display:block;margin-top:5px;color:#64748b;font-size:12px;line-height:1.5;}
+.data-table td.lab-result-abnormal {color:#b91c1c;font-weight:700;}
+.data-table td.lab-result-abnormal small {color:inherit;}
+.stage-comparison thead th.hc-stage-as01 {background:#dbeafe;color:#1e3a8a;}
+.stage-comparison thead th.hc-stage-as02 {background:#dcfce7;color:#14532d;}
+#dashboard-tambon-table tbody td:nth-child(n+2):nth-child(-n+5),
+#dashboard-hc-table tbody td:nth-child(n+3):nth-child(-n+6),
+#dashboard-moo-table tbody td:nth-child(n+4):nth-child(-n+7) {background:#eff6ff;color:#1e3a8a;}
+#dashboard-tambon-table tbody td:nth-child(n+6):nth-child(-n+9),
+#dashboard-hc-table tbody td:nth-child(n+7):nth-child(-n+10),
+#dashboard-moo-table tbody td:nth-child(n+8):nth-child(-n+11) {background:#f0fdf4;color:#14532d;}
+#dashboard-tambon-table tbody td:nth-child(6),
+#dashboard-hc-table tbody td:nth-child(7),
+#dashboard-moo-table tbody td:nth-child(8) {border-left:2px solid #cbd5e1;}
+
+/* Central-only session status */
+.login-overlay{overflow:auto;align-items:flex-start;padding:24px 12px;}
+.login-card{margin:auto;}
+.login-connection-settings{margin-top:16px;text-align:left;font-size:14px;}
+.login-connection-settings summary{cursor:pointer;color:#0f766e;}
+.login-connection-settings input{width:100%;margin:8px 0;box-sizing:border-box;}
+#login-connection-status{font-size:13px;color:#475569;}
+.pending-cloud-notice{position:sticky;top:0;z-index:900;background:#fff7ed;border:2px solid #f59e0b;padding:12px;}
+.pending-cloud-notice[hidden]{display:none;}

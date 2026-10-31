@@ -1,20 +1,13 @@
 /**
  * ระบบข้อมูลแหล่งแม่น้ำกก อ.แม่อาย
- * ฐานข้อมูลแหล่งน้ำ 147 บ่อ (สสอ.แม่อาย) และระบบคัดกรองสารหนู (Env-As-01 รวมรายชื่อซ้ำ 243 ราย / เก็บปัสสาวะ 90 ราย / คัดกรอง 2Q)
+ * ข้อมูลแหล่งน้ำและระบบคัดกรองสารหนูจาก Google Sheets หลังเข้าสู่ระบบส่วนกลาง
  * พื้นที่ ต.ท่าตอน และ ต.แม่นาวาง อ.แม่อาย จ.เชียงใหม่
  */
 
 // ลิงก์ Google Apps Script Web App URL เริ่มต้น (สามารถกดปุ่มฝังลิงก์ลงไฟล์ app.js ถาวรได้จากหน้าตั้งค่า)
-const DEFAULT_GAS_URL = '';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbz-v4XWwtZtgslTkOPey4lhIarPZOLiPci1_VsdqBGbdXYpp28dv_wHNYnZTlUb3oTt/exec';
 
-const STORAGE_KEY_WELLS = 'ARSENIC_GIS_WELLS_147_V5';
-const STORAGE_KEY_RESPONDENTS = 'ARSENIC_GIS_RESPONDENTS_TN283_V7';
-const STORAGE_KEY_ENV_AS02 = 'ARSENIC_GIS_ENV_AS02_TN283_V7';
-const STORAGE_KEY_WATER_LABS = 'ARSENIC_GIS_WATER_LABS_V1';
-const STORAGE_KEY_KNOWLEDGE_DOCS = 'ARSENIC_GIS_KNOWLEDGE_DOCS_V1';
-const STORAGE_KEY_GAS_URL = 'ARSENIC_GIS_GAS_URL_V1';
-const STORAGE_KEY_GAS_URL_BACKUP = 'MAEAI_KOK_GAS_URL_PERMANENT';
-const STORAGE_KEY_USER = 'ARSENIC_GIS_USER_V1';
+const STORAGE_KEY_GAS_URL = 'MAEAI_ONLINE_GAS_URL_V1';
 
 let state = {
   wells: [],
@@ -97,13 +90,15 @@ function syncAs01Checkboxes(chkClass, targetInputId, flagSelectId = null) {
   const checkedVals = Array.from(document.querySelectorAll('.' + chkClass + ':checked')).map(c => c.value);
   const targetInput = document.getElementById(targetInputId);
   if (targetInput) {
-    targetInput.value = checkedVals.join(', ');
+    const predefined=Array.from(document.querySelectorAll('.'+chkClass)).map(c=>c.value);
+    const extra=targetInput.value.split(',').map(s=>s.trim()).filter(s=>s&&!predefined.includes(s));
+    targetInput.value = [...checkedVals,...extra].join(', ');
   }
   if (flagSelectId) {
     const flagSel = document.getElementById(flagSelectId);
     if (flagSel) {
       if (checkedVals.length > 0) {
-        flagSel.value = flagSel.options[1] ? flagSel.options[1].value : 'ใช่';
+        flagSel.value = Array.from(flagSel.options).find(o => /^(ใช่|มี|2[).] ?มี)/.test(o.value))?.value || 'ใช่';
       }
     }
   }
@@ -192,12 +187,6 @@ window.addEventListener('DOMContentLoaded', () => {
   checkSavedSession();
 });
 
-function hasCorruptedEncoding(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) return true;
-  const sampleStr = JSON.stringify(arr[0]);
-  return sampleStr.includes('เธ') || sampleStr.includes('เน');
-}
-
 function inferHealthCenterByTambonMoo(tambon, moo) {
   const t = String(tambon || 'ท่าตอน').trim();
   const m = Number(moo) || 0;
@@ -219,340 +208,84 @@ function extractNumericYears(val, fallbackVal) {
   return '';
 }
 
-function normalizeWellRecord(w, idx) {
-  const d = Number(w.distance_river_m) || 0;
-  let distBand = 'มากกว่า 300 เมตร';
-  if (d <= 100) distBand = 'ไม่เกิน 100 เมตร';
-  else if (d <= 200) distBand = '101 - 200 เมตร';
-  else if (d <= 300) distBand = '201 - 300 เมตร';
-
-  let tambon = String(w.tambon || 'ท่าตอน').trim();
-  if (tambon === '' || tambon.includes('ม่าตอน')) tambon = 'ท่าตอน';
-
-  let hc = String(w.health_center || '').trim();
-  if (hc === 'รพ.สต.ท่ามะแกง') hc = 'รพ.สต.บ้านท่ามะแกง';
-  if (hc === '') hc = inferHealthCenterByTambonMoo(tambon, w.moo);
-
-  return {
-    ...w,
-    seq: Number(w.seq) || (idx + 1),
-    tambon: tambon,
-    health_center: hc,
-    depth_meters: w.depth_meters !== undefined ? w.depth_meters : '',
-    distance_river_m: d,
-    distance_band: distBand,
-    attachments: Array.isArray(w.attachments) ? w.attachments : []
-  };
+function validGasUrl(url) {
+ return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(String(url||'').trim());
 }
-
-function normalizeRespondentRecord(r, idx) {
-  const score = Number(r.total_score) || 0;
-  let rLevel = r.risk_level || 'ต่ำ';
-  if (rLevel === 'สูง') rLevel = 'มาก';
-  if (!['ต่ำ', 'ปานกลาง', 'มาก'].includes(rLevel)) {
-    if (score > 20) rLevel = 'มาก';
-    else if (score >= 10) rLevel = 'ปานกลาง';
-    else rLevel = 'ต่ำ';
-  }
-
-  let tambon = String(r.tambon || 'ท่าตอน').trim();
-  if (tambon === '' || tambon.includes('ม่าตอน')) tambon = 'ท่าตอน';
-
-  const codeStr = String(r.code || '');
-  const isTarget90 = r.is_urine_target !== undefined
-    ? Boolean(r.is_urine_target)
-    : (codeStr.startsWith('OCM') || codeStr.startsWith('NM') || codeStr.startsWith('CM'));
-
-  let hc = String(r.health_center || '').trim();
-  if (hc === 'รพ.สต.ท่ามะแกง') hc = 'รพ.สต.บ้านท่ามะแกง';
-  if (!hc) hc = inferHealthCenterByTambonMoo(tambon, r.moo);
-
-  const expYears = extractNumericYears(r.exposure_years, r.job_duration || r.years_in_area);
-
-  const q2_1 = r.q2_1 || 'ไม่ใช่';
-  const q2_2 = r.q2_2 || 'ไม่ใช่';
-  let status2q = r.status_2q || 'ยังไม่คัดกรอง';
-  if (q2_1 === 'ใช่' || q2_2 === 'ใช่') {
-    status2q = 'พบความเสี่ยง (Positive 2Q)';
-  }
-
-  return {
-    ...r,
-    seq: Number(r.seq) || (idx + 1),
-    total_score: score,
-    risk_level: rLevel,
-    is_urine_target: isTarget90,
-    urine_seq: r.urine_seq || (isTarget90 ? (idx + 1) : null),
-    source_tab: r.source_tab || (isTarget90 ? 'รายชื่อเก็บปัสสาวะ (90 ราย)' : 'การตอบกลับ (คัดกรองทั่วไป 153 ราย)'),
-    survey_date: r.survey_date || '2026-05-22',
-    interviewer_name: r.interviewer_name || 'เจ้าหน้าที่สาธารณสุข อ.แม่อาย',
-    tambon: tambon,
-    health_center: hc,
-    exposure_years: expYears,
-    q2_1: q2_1,
-    q2_2: q2_2,
-    status_2q: status2q,
-    date_2q: r.date_2q || '',
-    assessor_2q: r.assessor_2q || '',
-    note_2q: r.note_2q || ''
-  };
-}
-
-// ==================== MULTI-LAYER PERSISTENT STORAGE FOR GOOGLE SHEETS URL ====================
-function getCookieGasUrl() {
-  try {
-    const match = document.cookie.match(/(?:^|;\s*)MAEAI_KOK_GAS_URL=([^;]+)/);
-    return match ? decodeURIComponent(match[1]) : '';
-  } catch (e) {
-    return '';
-  }
-}
-
-function saveGasUrlToIndexedDB(url) {
-  try {
-    if (!window.indexedDB) return;
-    const req = indexedDB.open('MaeAiKokRiverConfigDB', 1);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('settings')) {
-        db.createObjectStore('settings');
-      }
-    };
-    req.onsuccess = (e) => {
-      const db = e.target.result;
-      const tx = db.transaction('settings', 'readwrite');
-      tx.objectStore('settings').put(url, 'gasUrl');
-    };
-  } catch (e) {}
-}
-
-function restoreGasUrlFromIndexedDB() {
-  try {
-    if (!window.indexedDB) return;
-    const req = indexedDB.open('MaeAiKokRiverConfigDB', 1);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('settings')) {
-        db.createObjectStore('settings');
-      }
-    };
-    req.onsuccess = (e) => {
-      const db = e.target.result;
-      const tx = db.transaction('settings', 'readonly');
-      const getReq = tx.objectStore('settings').get('gasUrl');
-      getReq.onsuccess = () => {
-        const idbUrl = (getReq.result || '').trim();
-        if (idbUrl && !state.gasUrl) {
-          applyRestoredGasUrl(idbUrl, true);
-        }
-      };
-    };
-  } catch (e) {}
-}
-
 function persistGasUrlEverywhere(url) {
-  const cleanUrl = (url || '').trim();
-  state.gasUrl = cleanUrl;
-  try {
-    localStorage.setItem(STORAGE_KEY_GAS_URL, cleanUrl);
-    localStorage.setItem(STORAGE_KEY_GAS_URL_BACKUP, cleanUrl);
-  } catch (e) {}
-  try {
-    document.cookie = `MAEAI_KOK_GAS_URL=${encodeURIComponent(cleanUrl)}; max-age=315360000; path=/; SameSite=Lax`;
-  } catch (e) {}
-  saveGasUrlToIndexedDB(cleanUrl);
+ if(!validGasUrl(url))throw Error('ใช้ลิงก์ Google Apps Script ที่ลงท้าย /exec เท่านั้น');
+ state.gasUrl=url.trim();
+ try{localStorage.setItem(STORAGE_KEY_GAS_URL,state.gasUrl);}catch(e){}
+ applyRestoredGasUrl(state.gasUrl);
+}
+function applyRestoredGasUrl(url) {
+ if(!validGasUrl(url))return;
+ state.gasUrl=url.trim();state.gasUnlocked=false;
+ for(const id of ['gas-url-input','login-gas-url']){const input=document.getElementById(id);if(input){input.value=state.gasUrl;if(id==='gas-url-input')input.readOnly=true;}}
+ updateSyncBadge(false);
+}
+function setLoginMessage(message) {
+ const el=document.getElementById('login-error');if(el){el.textContent=message;el.style.display=message?'block':'none';}
+}
+function clearSessionData() {
+ state.sessionEpoch=(state.sessionEpoch||0)+1;
+ for(const request of state.activeCloudRequests||[])request.abort();
+ state.cloudToken=null;state.currentUser=null;state.dataLoaded=false;state.cloudVerified=false;
+ state.pendingWrites=[];state.cloudFlushPromise=null;state.currentWellAttachments=[];state.detailedScreening=null;state.pickingMode=null;
+ for(const key of ['wells','respondents','envAs02','waterLabs','knowledgeDocs'])state[key]=[];
+ document.getElementById('app-container').style.display='none';
+ document.getElementById('login-screen').style.display='flex';
+ document.querySelectorAll('.modal-backdrop').forEach(el=>{el.style.display='none';});
+ document.querySelectorAll('form').forEach(el=>el.reset());
+ document.querySelectorAll('input,textarea').forEach(el=>{if(!['checkbox','radio','button','submit'].includes(el.type)&&!['gas-url-input','login-gas-url'].includes(el.id))el.value='';});
+ state.map?.closePopup();state.markersLayer?.clearLayers();state.linksLayer?.clearLayers();
+ // Re-render all dynamic tables and option lists with empty arrays, including hidden tabs.
+ refreshAllViews();renderWellFilesPreview();populateAs02RespondentDropdown();
+ for(const id of ['source-record-modal','review-record-modal'])document.getElementById(id)?.remove();
+ for(const id of ['well-gallery-body','well-gallery-content','current-user-display','knowledge-preview-body','kb-viewer-body','q2-modal-person-info'])setHtml(id,'');
+ const personSelect=document.getElementById('q2-modal-resp-select');if(personSelect)personSelect.innerHTML='<option value="">-- เลือกรายชื่อหลังเข้าสู่ระบบ --</option>';
+ const download=document.getElementById('kb-viewer-download');if(download){download.href='#';download.removeAttribute('download');}
+ for(const [id,markup] of state.cleanModalTitles||[])setHtml(id,markup);
+ updatePendingNotice();
 }
 
-function applyRestoredGasUrl(url, autoPull = false) {
-  const cleanUrl = (url || '').trim();
-  if (!cleanUrl) return;
-  state.gasUrl = cleanUrl;
-  try {
-    localStorage.setItem(STORAGE_KEY_GAS_URL, cleanUrl);
-    localStorage.setItem(STORAGE_KEY_GAS_URL_BACKUP, cleanUrl);
-  } catch (e) {}
-
-  const gasInput = document.getElementById('gas-url-input');
-  if (gasInput) {
-    gasInput.value = cleanUrl;
-    // ล็อกช่องอัตโนมัติเมื่อมีลิงก์ที่บันทึกไว้แล้ว เพื่อไม่ให้เผลอลบ
-    state.gasUnlocked = false;
-    gasInput.readOnly = true;
-    gasInput.style.background = '#e2e8f0';
-    gasInput.style.cursor = 'not-allowed';
-    const unlockBtn = document.getElementById('btn-unlock-gas');
-    if (unlockBtn) unlockBtn.innerHTML = `<i class="fa-solid fa-key"></i> ปลดล็อกแก้ไขลิงก์ (เฉพาะ Admin)`;
-  }
-  updateSyncBadge(true);
-  logCloudMessage(`เชื่อมต่อลิงก์ Google Sheets ที่บันทึกไว้เรียบร้อยแล้ว: ${cleanUrl}`);
-  if (autoPull) {
-    pullFromGoogleSheets(true);
-  }
-}
-
-function loadLocalData() {
-  // 1. กู้คืนลิงก์ Google Apps Script Web App URL เป็นอันดับแรกสุด (ไม่ให้กระทบหากข้อมูลอื่นมีปัญหา)
-  let initialGasUrl = (typeof DEFAULT_GAS_URL !== 'undefined' && DEFAULT_GAS_URL) ? DEFAULT_GAS_URL.trim() : '';
-  if (!initialGasUrl) {
-    try {
-      initialGasUrl = localStorage.getItem(STORAGE_KEY_GAS_URL) || localStorage.getItem(STORAGE_KEY_GAS_URL_BACKUP) || '';
-    } catch (e) {}
-  }
-  if (!initialGasUrl) {
-    initialGasUrl = getCookieGasUrl();
-  }
-
-  try {
-    // ล้างเฉพาะคีย์ข้อมูลรุ่นเก่า (ห้ามลบคีย์ลิงก์ Google Sheets เด็ดขาด)
-    ['ARSENIC_GIS_WELLS_V1', 'ARSENIC_GIS_RESPONDENTS_V1', 'ARSENIC_GIS_WELLS_147_V2', 'ARSENIC_GIS_RESPONDENTS_130_V2', 'ARSENIC_GIS_WELLS_147_V3', 'ARSENIC_GIS_RESPONDENTS_130_V3', 'ARSENIC_GIS_RESPONDENTS_283_V5', 'ARSENIC_GIS_ENV_AS02_V5'].forEach(k => localStorage.removeItem(k));
-
-    const savedWells = localStorage.getItem(STORAGE_KEY_WELLS);
-    const savedResps = localStorage.getItem(STORAGE_KEY_RESPONDENTS);
-    const savedAs02 = localStorage.getItem(STORAGE_KEY_ENV_AS02);
-    const savedLabs = localStorage.getItem(STORAGE_KEY_WATER_LABS);
-    const savedDocs = localStorage.getItem(STORAGE_KEY_KNOWLEDGE_DOCS);
-
-    let parsedWells = savedWells ? JSON.parse(savedWells) : null;
-    let parsedResps = savedResps ? JSON.parse(savedResps) : null;
-    let parsedAs02 = savedAs02 ? JSON.parse(savedAs02) : null;
-    let parsedLabs = savedLabs ? JSON.parse(savedLabs) : null;
-    let parsedDocs = savedDocs ? JSON.parse(savedDocs) : null;
-
-    if (!parsedWells || hasCorruptedEncoding(parsedWells)) {
-      parsedWells = [...INITIAL_WELLS];
-    }
-    if (!parsedResps || hasCorruptedEncoding(parsedResps) || parsedResps.length < 240) {
-      parsedResps = [...INITIAL_RESPONDENTS];
-    }
-    if (!parsedAs02 || hasCorruptedEncoding(parsedAs02) || parsedAs02.length < 85) {
-      parsedAs02 = typeof INITIAL_ENV_AS02 !== 'undefined' ? [...INITIAL_ENV_AS02] : [];
-    }
-    if (!parsedLabs || !Array.isArray(parsedLabs) || parsedLabs.length === 0) {
-      parsedLabs = [...INITIAL_WATER_LABS];
-    }
-    if (!parsedDocs || !Array.isArray(parsedDocs) || parsedDocs.length === 0) {
-      parsedDocs = [...INITIAL_KNOWLEDGE_DOCS];
-    }
-
-    state.wells = parsedWells.map(normalizeWellRecord);
-    state.respondents = parsedResps.map(normalizeRespondentRecord);
-    state.envAs02 = parsedAs02;
-    state.waterLabs = parsedLabs;
-    state.knowledgeDocs = parsedDocs;
-  } catch (err) {
-    console.error('Error loading localStorage:', err);
-    state.wells = INITIAL_WELLS.map(normalizeWellRecord);
-    state.respondents = INITIAL_RESPONDENTS.map(normalizeRespondentRecord);
-    state.envAs02 = typeof INITIAL_ENV_AS02 !== 'undefined' ? [...INITIAL_ENV_AS02] : [];
-    state.waterLabs = [...INITIAL_WATER_LABS];
-    state.knowledgeDocs = [...INITIAL_KNOWLEDGE_DOCS];
-  }
-
-  if (initialGasUrl) {
-    applyRestoredGasUrl(initialGasUrl, true);
-  } else {
-    // หากยังไม่มีลิงก์ ให้เปิดช่องกรอกพร้อมใช้งานทันที และค้นหาใน IndexedDB เพิ่มเติม
-    state.gasUnlocked = true;
-    restoreGasUrlFromIndexedDB();
-  }
-}
-
-function saveLocalData() {
-  localStorage.setItem(STORAGE_KEY_WELLS, JSON.stringify(state.wells));
-  localStorage.setItem(STORAGE_KEY_RESPONDENTS, JSON.stringify(state.respondents));
-  localStorage.setItem(STORAGE_KEY_ENV_AS02, JSON.stringify(state.envAs02));
-  localStorage.setItem(STORAGE_KEY_WATER_LABS, JSON.stringify(state.waterLabs));
-  if (state.gasUrl) {
-    persistGasUrlEverywhere(state.gasUrl);
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY_KNOWLEDGE_DOCS, JSON.stringify(state.knowledgeDocs));
-  } catch (e) {
-    console.warn('Knowledge docs storage quota:', e);
-  }
-  refreshAllViews();
-}
-
-// ==================== AUTHENTICATION (LOGIN / LOGOUT) ====================
 function checkSavedSession() {
-  try {
-    const savedUser = sessionStorage.getItem(STORAGE_KEY_USER);
-    if (savedUser) {
-      state.currentUser = JSON.parse(savedUser);
-    } else {
-      state.currentUser = {
-        username: 'admin',
-        displayName: 'ผู้ดูแลระบบ (Admin สสอ.)',
-        role: 'admin'
-      };
-      sessionStorage.setItem(STORAGE_KEY_USER, JSON.stringify(state.currentUser));
-    }
-  } catch (e) {
-    state.currentUser = {
-      username: 'admin',
-      displayName: 'ผู้ดูแลระบบ (Admin สสอ.)',
-      role: 'admin'
-    };
-  }
-  enterApplication();
+ clearSessionData();setLoginMessage('');
 }
 
-function handleLogin(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  const username = document.getElementById('login-username').value.trim();
-  const password = document.getElementById('login-password').value.trim();
-  const errEl = document.getElementById('login-error');
-
-  const validAccounts = {
-    admin: { pass: '1234', displayName: 'ผู้ดูแลระบบ (Admin สสอ.)', role: 'admin' },
-    staff: { pass: '1234', displayName: 'เจ้าหน้าที่ รพ.สต. (Staff)', role: 'staff' },
-    maeai: { pass: '1234', displayName: 'สาธารณสุขอำเภอแม่อาย', role: 'admin' }
-  };
-
-  if (validAccounts[username] && validAccounts[username].pass === password) {
-    errEl.style.display = 'none';
-    state.currentUser = {
-      username,
-      displayName: validAccounts[username].displayName,
-      role: validAccounts[username].role
-    };
-    try {
-      sessionStorage.setItem(STORAGE_KEY_USER, JSON.stringify(state.currentUser));
-    } catch (err) {}
-    enterApplication();
-  } else {
-    errEl.style.display = 'block';
-  }
+async function handleLogin(e) {
+ e?.preventDefault();if(state.loginBusy)return;
+ const username=document.getElementById('login-username').value.trim();
+ const password=document.getElementById('login-password').value;
+ if(!username||!password){setLoginMessage('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');return;}
+ state.loginBusy=true;
+ const button=document.querySelector('#login-form button[type="submit"]');if(button)button.disabled=true;
+ try{
+  setLoginMessage('');
+  if(state.cloudProbe&&!state.cloudProbeComplete)await state.cloudProbe;
+  if(!state.cloudCapabilities)await probeCloudConnection();
+  if(!state.cloudCapabilities)throw Error(state.connectionError||'เชื่อมต่อส่วนกลางไม่ได้ กรุณาตรวจลิงก์และอินเทอร์เน็ต');
+  await loginToCentral(username,password);
+ }catch(e){setLoginMessage(e.message);}
+ finally{state.loginBusy=false;if(button)button.disabled=false;document.getElementById('login-password').value='';}
 }
 
 function handleLogout() {
-  try {
-    sessionStorage.removeItem(STORAGE_KEY_USER);
-  } catch (err) {}
-  state.currentUser = null;
-  document.getElementById('app-container').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
+ if(pendingCloudWrites().length&&!confirm('มีรายการที่ Google Sheets ยังไม่ยืนยัน '+pendingCloudWrites().length+' รายการ ออกจากระบบและละทิ้งรายการรอส่งหรือไม่? หากต้องการเก็บไว้ กดยกเลิกแล้วกดส่งรายการรอส่งหรือดาวน์โหลดสำรองก่อน'))return;
+ const token=state.cloudToken;
+ clearSessionData();setLoginMessage('');
+ if(token)cloudRequest({action:'logout',token}).catch(()=>{});
 }
 
 function enterApplication() {
-  const loginEl = document.getElementById('login-screen');
-  const appEl = document.getElementById('app-container');
-  if (loginEl) loginEl.style.display = 'none';
-  if (appEl) appEl.style.display = 'block';
-  if (state.currentUser && document.getElementById('current-user-display')) {
-    document.getElementById('current-user-display').textContent = state.currentUser.displayName;
-  }
-
-  refreshAllViews();
-
-  if (!state.map && typeof L !== 'undefined') {
-    try {
-      initMap();
-      fetchLocalWeather();
-    } catch (err) {
-      console.warn('Map init warning:', err);
-    }
-  }
+ if(!state.cloudToken||!state.currentUser||!state.dataLoaded)return false;
+ document.getElementById('login-screen').style.display='none';
+ document.getElementById('app-container').style.display='block';
+ setText('current-user-display',state.currentUser.displayName||state.currentUser.username);
+ refreshAllViews();updatePendingNotice();
+ if(!state.map&&typeof L!=='undefined'){
+  try{initMap();renderMapMarkers();fetchLocalWeather();}catch(e){console.warn('Map unavailable');}
+ }
+ return true;
 }
 
 // ==================== NAVIGATION TABS ====================
@@ -566,10 +299,21 @@ function switchTab(tabId) {
   const btn = document.querySelector(`.nav-tab[data-tab="${tabId}"]`);
   if (btn) btn.classList.add('active');
 
-  if (tabId === 'tab-map' && state.map) {
-    setTimeout(() => {
-      state.map.invalidateSize();
-    }, 150);
+  if (tabId === 'tab-map') {
+    if (!state.map && typeof L !== 'undefined') initMap();
+    if (state.map) {
+      setTimeout(() => {
+        state.map.invalidateSize();
+        renderMapMarkers();
+        if (!state.mapInitialViewFitted && state.markersLayer.getLayers().length) {
+          zoomToAllMarkers();
+          state.mapInitialViewFitted = true;
+        }
+      }, 150);
+    } else {
+      const canvas = document.getElementById('map-canvas');
+      if (canvas) canvas.innerHTML = '<div style="padding:24px;color:#b91c1c;">ยังโหลดส่วนแผนที่ไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วรีเฟรชหน้าเว็บ</div>';
+    }
   }
 }
 
@@ -640,6 +384,8 @@ function filterByRiskFromKpi(riskLevel) {
 
 // ==================== MAP & WEATHER RADAR (LEAFLET) ====================
 function initMap() {
+  if (state.map) return;
+  if (typeof L === 'undefined') return;
   state.map = L.map('map-canvas', {
     center: [20.0560, 99.4150],
     zoom: 13
@@ -693,6 +439,7 @@ function initMap() {
     state.pickingMode = null;
     document.getElementById('map-Pick-hint').style.display = 'none';
   });
+  renderMapMarkers();
 }
 
 function setBaseMap(mode) {
@@ -831,6 +578,7 @@ function renderMapMarkers() {
             <ul style="padding-left:16px; margin:4px 0;">${userNamesHtml || '<li>ยังไม่มีรายชื่อผูกตรง</li>'}${moreCount}</ul>
           </div>
           <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+            ${wellGoogleMapsLink(lat,lng)}
             <button onclick="openWellModal('${well.well_id}')" style="padding:4px 8px; background:#0f766e; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">แก้ไข/เพิ่มรูป</button>
             <button onclick="openWellGalleryModal('${well.well_id}')" style="padding:4px 8px; background:#0369a1; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">📷 รูปภาพ (${attCount})</button>
             <button onclick="filterPeopleByWell('${well.well_id}')" style="padding:4px 8px; background:#0284c7; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">ดูผู้ใช้น้ำ</button>
@@ -891,7 +639,7 @@ function renderMapMarkers() {
             👤 ${person.full_name} <span style="color:#0284c7;">(${person.code || '-'})</span>
           </div>
           <div style="font-size:12.5px; margin-top:4px; line-height:1.45;">
-            <b>แท็บข้อมูล:</b> ${person.is_urine_target ? '<span style="color:#15803d;font-weight:700;">รายชื่อเก็บปัสสาวะ (90 ราย)</span>' : '<span style="color:#0369a1;font-weight:700;">การตอบกลับ (ทั่วไป 153 ราย)</span>'}<br/>
+            <b>แท็บข้อมูล:</b> ${person.is_urine_target ? '<span style="color:#15803d;font-weight:700;">รายชื่อเก็บปัสสาวะ (รายชื่อขั้น 2)</span>' : '<span style="color:#0369a1;font-weight:700;">การตอบกลับ (ขั้นแรก)</span>'}<br/>
             <b>อายุ/เพศ:</b> ${person.age || '-'} ปี (${person.gender})<br/>
             <b>ที่อยู่:</b> บ้านเลขที่ ${person.house_no || '-'} หมู่ ${person.moo} ต.${person.tambon}<br/>
             <b>รพ.สต.:</b> ${person.health_center || '-'}<br/>
@@ -964,6 +712,7 @@ function pickLocationOnMap(targetType) {
 
 // ==================== REFRESH ALL UI VIEWS & DASHBOARDS ====================
 function refreshAllViews() {
+  refreshFiscalYearOptions();
   updateKpiCards();
   renderExecutiveDashboard();
   renderScreeningDashboardAndTables();
@@ -976,864 +725,11 @@ function refreshAllViews() {
   renderMapMarkers();
 }
 
-function updateKpiCards() {
-  const totalWells = state.wells.length;
-  const shallowCount = state.wells.filter(w => w.well_type === 'บ่อน้ำตื้น').length;
-  const groundwaterCount = state.wells.filter(w => w.well_type === 'บ่อบาดาล').length;
-  const mountainCount = state.wells.filter(w => w.well_type === 'ประปาภูเขา').length;
-  const sampleCount = state.wells.filter(w => w.sample_code && w.sample_code !== '').length;
-  const near100Count = state.wells.filter(w => Number(w.distance_river_m) <= 100).length;
-
-  const totalResp = state.respondents.length;
-  const urineTargetCount = state.respondents.filter(r => r.is_urine_target).length;
-  const lowCount = state.respondents.filter(r => r.risk_level === 'ต่ำ').length;
-  const medCount = state.respondents.filter(r => r.risk_level === 'ปานกลาง').length;
-  const highCount = state.respondents.filter(r => r.risk_level === 'มาก').length;
-
-  const q2Screened = state.respondents.filter(r => r.status_2q && r.status_2q !== 'ยังไม่คัดกรอง').length;
-  const q2Normal = state.respondents.filter(r => String(r.status_2q).includes('ปกติ')).length;
-  const q2Pos = state.respondents.filter(r => String(r.status_2q).includes('พบความเสี่ยง')).length;
-
-  document.getElementById('nav-well-count').textContent = totalWells;
-  document.getElementById('nav-resp-count').textContent = totalResp;
-  if (document.getElementById('nav-lab-count')) {
-    document.getElementById('nav-lab-count').textContent = state.waterLabs ? state.waterLabs.length : 0;
-  }
-  document.getElementById('kpi-total-wells').textContent = totalWells;
-  document.getElementById('kpi-well-sub').textContent = `บาดาล ${groundwaterCount} | น้ำตื้น ${shallowCount} | ประปาภูเขา ${mountainCount}`;
-  document.getElementById('kpi-sample-wells').textContent = sampleCount;
-  document.getElementById('kpi-near-wells').textContent = near100Count;
-  document.getElementById('kpi-total-resp').textContent = `${totalResp} / ${urineTargetCount}`;
-  document.getElementById('kpi-tambon-sub').textContent = `แท็บการตอบกลับ (${totalResp}) | แท็บเก็บปัสสาวะ (${urineTargetCount})`;
-  document.getElementById('kpi-risk-alert').textContent = medCount + highCount;
-  document.getElementById('kpi-risk-sub').textContent = `ต่ำ ${lowCount} | ปานกลาง ${medCount} | สูง ${highCount}`;
-
-  if (document.getElementById('kpi-2q-screened')) {
-    document.getElementById('kpi-2q-screened').textContent = `${q2Screened} / ${totalResp}`;
-  }
-  if (document.getElementById('kpi-2q-sub')) {
-    document.getElementById('kpi-2q-sub').textContent = `ปกติ ${q2Normal} | พบความเสี่ยง 2Q ${q2Pos} ราย`;
-  }
-}
-
-function renderExecutiveDashboard() {
-  const totalWells = Math.max(1, state.wells.length);
-
-  // 1. กราฟประเภทแหล่งน้ำ
-  const typesData = [
-    { label: 'บ่อบาดาล', count: state.wells.filter(w => w.well_type === 'บ่อบาดาล').length, color: '#0284c7' },
-    { label: 'บ่อน้ำตื้น (ส่งตรวจ P1-P43)', count: state.wells.filter(w => w.well_type === 'บ่อน้ำตื้น').length, color: '#e11d48' },
-    { label: 'ประปาภูเขา', count: state.wells.filter(w => w.well_type === 'ประปาภูเขา').length, color: '#0f766e' }
-  ];
-  const typeContainer = document.getElementById('chart-well-types');
-  if (typeContainer) {
-    typeContainer.innerHTML = typesData.map(item => {
-      const pct = ((item.count / totalWells) * 100).toFixed(1);
-      return `
-        <div class="bar-row" onclick="filterWellByTypeClick('${item.label.split(' ')[0]}')">
-          <div class="bar-label-line">
-            <span>${item.label}</span>
-            <strong>${item.count} บ่อ (${pct}%)</strong>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:${pct}%; background:${item.color};"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 2. กราฟระยะห่างจากแม่น้ำกก
-  const distRanges = [
-    { label: 'ไม่เกิน 100 เมตร (ใกล้ลำน้ำกกมาก)', key: 'ไม่เกิน 100 เมตร', count: state.wells.filter(w => Number(w.distance_river_m) <= 100).length, color: '#dc2626' },
-    { label: '101 - 200 เมตร', key: '101 - 200 เมตร', count: state.wells.filter(w => Number(w.distance_river_m) > 100 && Number(w.distance_river_m) <= 200).length, color: '#f97316' },
-    { label: '201 - 300 เมตร', key: '201 - 300 เมตร', count: state.wells.filter(w => Number(w.distance_river_m) > 200 && Number(w.distance_river_m) <= 300).length, color: '#eab308' },
-    { label: 'มากกว่า 300 เมตร', key: 'มากกว่า 300 เมตร', count: state.wells.filter(w => Number(w.distance_river_m) > 300).length, color: '#22c55e' }
-  ];
-  const distContainer = document.getElementById('chart-well-distance');
-  if (distContainer) {
-    distContainer.innerHTML = distRanges.map(b => {
-      const pct = ((b.count / totalWells) * 100).toFixed(1);
-      return `
-        <div class="bar-row" onclick="filterWellByDistClick('${b.key}')">
-          <div class="bar-label-line">
-            <span>${b.label}</span>
-            <strong>${b.count} บ่อ (${pct}%)</strong>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:${pct}%; background:${b.color};"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 3. กราฟแยกตาม รพ.สต.
-  const hcNames = ['รพ.สต.บ้านท่าตอน', 'รพ.สต.บ้านท่ามะแกง', 'รพ.สต.บ้านเมืองงาม', 'รพ.สต.บ้านแม่เมืองน้อย'];
-  const hcColors = ['#0f766e', '#0284c7', '#7c3aed', '#d97706'];
-  const hcContainer = document.getElementById('chart-well-hc');
-  if (hcContainer) {
-    hcContainer.innerHTML = hcNames.map((hc, idx) => {
-      const c = state.wells.filter(w => w.health_center === hc).length;
-      const pct = ((c / totalWells) * 100).toFixed(1);
-      return `
-        <div class="bar-row" onclick="filterWellByHcClick('${hc}')">
-          <div class="bar-label-line">
-            <span>${hc}</span>
-            <strong>${c} บ่อ (${pct}%)</strong>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:${pct}%; background:${hcColors[idx % hcColors.length]};"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 4. ตารางสรุปแหล่งน้ำแยกตาม ตำบล / หมู่บ้าน
-  const mooGroups = {};
-  state.wells.forEach(w => {
-    const key = `${w.tambon}|${w.moo}`;
-    if (!mooGroups[key]) {
-      mooGroups[key] = {
-        tambon: w.tambon,
-        moo: w.moo,
-        hc: w.health_center,
-        shallow: 0,
-        groundwater: 0,
-        mountain: 0,
-        total: 0,
-        sample: 0,
-        users: 0
-      };
-    }
-    const g = mooGroups[key];
-    if (w.well_type === 'บ่อน้ำตื้น') g.shallow++;
-    else if (w.well_type === 'บ่อบาดาล') g.groundwater++;
-    else if (w.well_type === 'ประปาภูเขา') g.mountain++;
-    g.total++;
-    if (w.sample_code) g.sample++;
-    g.users += Number(w.user_count) || 1;
-  });
-
-  const sortedMoo = Object.values(mooGroups).sort((a, b) => {
-    if (a.tambon !== b.tambon) return a.tambon.localeCompare(b.tambon, 'th');
-    return Number(a.moo) - Number(b.moo);
-  });
-
-  const mooBody = document.getElementById('dash-moo-breakdown-body');
-  if (mooBody) {
-    let sumShallow = 0, sumGround = 0, sumMtn = 0, sumTot = 0, sumSample = 0, sumUsers = 0;
-    const rowsHtml = sortedMoo.map(g => {
-      sumShallow += g.shallow;
-      sumGround += g.groundwater;
-      sumMtn += g.mountain;
-      sumTot += g.total;
-      sumSample += g.sample;
-      sumUsers += g.users;
-      return `
-        <tr>
-          <td><b>ต.${g.tambon} หมู่ที่ ${g.moo}</b></td>
-          <td>${g.hc}</td>
-          <td class="text-center">${g.shallow || '-'}</td>
-          <td class="text-center">${g.groundwater || '-'}</td>
-          <td class="text-center">${g.mountain || '-'}</td>
-          <td class="text-center"><b>${g.total}</b></td>
-          <td class="text-center"><span class="risk-badge status-danger">${g.sample || 0}</span></td>
-          <td class="text-center">${g.users} คน</td>
-        </tr>
-      `;
-    }).join('');
-
-    mooBody.innerHTML = rowsHtml + `
-      <tr style="background:#f1f5f9; font-weight:700;">
-        <td colspan="2">รวมทั้งหมด (${sortedMoo.length} หมู่บ้านเป้าหมาย)</td>
-        <td class="text-center">${sumShallow}</td>
-        <td class="text-center">${sumGround}</td>
-        <td class="text-center">${sumMtn}</td>
-        <td class="text-center">${sumTot}</td>
-        <td class="text-center">${sumSample}</td>
-        <td class="text-center">${sumUsers} คน</td>
-      </tr>
-    `;
-  }
-
-  // 5. แยกแสดงผล 2 แท็บออกจากกันชัดเจน: แท็บที่ 1 (การตอบกลับ 243 ราย) vs แท็บที่ 2 (รายชื่อเก็บปัสสาวะ 90 ราย)
-  const riskLevels = [
-    { label: 'กลุ่มโอกาสสัมผัสสารหนู ต่ำ', range: '0 - <10', key: 'ต่ำ', color: '#16a34a', badge: 'risk-low', measure: 'สื่อสารความเสี่ยง ให้สุขศึกษา ประเมินซ้ำทุก 1 ปี' },
-    { label: 'กลุ่มโอกาสสัมผัสสารหนู ปานกลาง', range: '10 - 20', key: 'ปานกลาง', color: '#f97316', badge: 'risk-med', measure: 'ซักประวัติ Env-As-02 & ตรวจสารหนูในปัสสาวะ' },
-    { label: 'กลุ่มโอกาสสัมผัสสารหนู สูง/มาก', range: '> 20', key: 'มาก', color: '#dc2626', badge: 'risk-high', measure: 'พบแพทย์ตรวจร่างกาย & ตรวจสารหนูในปัสสาวะ' }
-  ];
-
-  const tab1Pool = state.respondents;
-  const tab2Pool = state.respondents.filter(r => r.is_urine_target);
-  const totalTab1 = Math.max(1, tab1Pool.length);
-  const totalTab2 = Math.max(1, tab2Pool.length);
-
-  // 5.1 แท็บที่ 1: การตอบกลับ (243 ราย)
-  const tab1ChartEl = document.getElementById('chart-resp-tab1-risk');
-  if (tab1ChartEl) {
-    tab1ChartEl.innerHTML = riskLevels.map(r => {
-      const c = tab1Pool.filter(p => p.risk_level === r.key).length;
-      const pct = ((c / totalTab1) * 100).toFixed(1);
-      return `
-        <div class="bar-row" onclick="filterByRiskFromKpi('${r.key}')">
-          <div class="bar-label-line">
-            <span>${r.label} (${r.range} คะแนน)</span>
-            <strong>${c} ราย (${pct}%)</strong>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:${pct}%; background:${r.color};"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  const tab1MatrixEl = document.getElementById('dash-risk-matrix-tab1-body');
-  if (tab1MatrixEl) {
-    let t1ThatonSum = 0, t1MaeSum = 0;
-    const rows = riskLevels.map(r => {
-      const thaton = tab1Pool.filter(p => p.risk_level === r.key && p.tambon === 'ท่าตอน').length;
-      const maenawang = tab1Pool.filter(p => p.risk_level === r.key && p.tambon === 'แม่นาวาง').length;
-      const tot = thaton + maenawang;
-      t1ThatonSum += thaton;
-      t1MaeSum += maenawang;
-      return `
-        <tr>
-          <td><span class="risk-badge ${r.badge}">${r.key}</span></td>
-          <td>${r.range}</td>
-          <td>${thaton}</td>
-          <td>${maenawang}</td>
-          <td><b>${tot}</b></td>
-          <td style="text-align:left; font-size:12px;">${r.measure}</td>
-        </tr>
-      `;
-    }).join('');
-    tab1MatrixEl.innerHTML = rows + `
-      <tr style="background:#e0f2fe; font-weight:700; color:#0369a1;">
-        <td colspan="2">รวมแท็บ "การตอบกลับ" ทั้งหมด</td>
-        <td>${t1ThatonSum}</td>
-        <td>${t1MaeSum}</td>
-        <td><b>${t1ThatonSum + t1MaeSum} ราย</b></td>
-        <td style="text-align:left; font-size:12px;">คัดกรองทั่วไป ${tab1Pool.length - tab2Pool.length} ราย + เก็บปัสสาวะ ${tab2Pool.length} ราย</td>
-      </tr>
-    `;
-  }
-
-  // 5.2 แท็บที่ 2: รายชื่อเก็บปัสสาวะ (90 ราย)
-  const tab2ChartEl = document.getElementById('chart-resp-tab2-risk');
-  if (tab2ChartEl) {
-    tab2ChartEl.innerHTML = riskLevels.map(r => {
-      const c = tab2Pool.filter(p => p.risk_level === r.key).length;
-      const pct = ((c / totalTab2) * 100).toFixed(1);
-      return `
-        <div class="bar-row" onclick="filterRespondentsByBreakdown('ALL','ALL','','TARGET_90')">
-          <div class="bar-label-line">
-            <span>${r.label} (${r.range} คะแนน)</span>
-            <strong>${c} ราย (${pct}%)</strong>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:${pct}%; background:${r.color};"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  const tab2PivotEl = document.getElementById('dash-pivot-tab2-body');
-  if (tab2PivotEl) {
-    const newGrpThaton = tab2Pool.filter(r => r.target_group === 'กลุ่มใหม่' && r.tambon === 'ท่าตอน').length;
-    const newGrpMae = tab2Pool.filter(r => r.target_group === 'กลุ่มใหม่' && r.tambon === 'แม่นาวาง').length;
-    const occGrpThaton = tab2Pool.filter(r => r.target_group === 'ผู้ประกอบอาชีพ' && r.tambon === 'ท่าตอน').length;
-    const occGrpMae = tab2Pool.filter(r => r.target_group === 'ผู้ประกอบอาชีพ' && r.tambon === 'แม่นาวาง').length;
-
-    const rLowT = tab2Pool.filter(r => r.risk_level === 'ต่ำ' && r.tambon === 'ท่าตอน').length;
-    const rLowM = tab2Pool.filter(r => r.risk_level === 'ต่ำ' && r.tambon === 'แม่นาวาง').length;
-    const rMedT = tab2Pool.filter(r => r.risk_level === 'ปานกลาง' && r.tambon === 'ท่าตอน').length;
-    const rMedM = tab2Pool.filter(r => r.risk_level === 'ปานกลาง' && r.tambon === 'แม่นาวาง').length;
-    const rHighT = tab2Pool.filter(r => r.risk_level === 'มาก' && r.tambon === 'ท่าตอน').length;
-    const rHighM = tab2Pool.filter(r => r.risk_level === 'มาก' && r.tambon === 'แม่นาวาง').length;
-
-    tab2PivotEl.innerHTML = `
-      <tr>
-        <td style="text-align:left;">1. กลุ่มใหม่ (NM001 - NM080)</td>
-        <td>${newGrpThaton}</td>
-        <td>${newGrpMae}</td>
-        <td><b>${newGrpThaton + newGrpMae}</b></td>
-      </tr>
-      <tr>
-        <td style="text-align:left;">2. ผู้ประกอบอาชีพ (OCM001 - OCM010)</td>
-        <td>${occGrpThaton}</td>
-        <td>${occGrpMae || '-'}</td>
-        <td><b>${occGrpThaton + occGrpMae}</b></td>
-      </tr>
-      <tr style="background:#f8fafc;">
-        <td style="text-align:left;"><span class="risk-badge risk-low">ความเสี่ยงต่ำ</span> (ในกลุ่มเก็บปัสสาวะ)</td>
-        <td>${rLowT}</td>
-        <td>${rLowM}</td>
-        <td><b>${rLowT + rLowM}</b></td>
-      </tr>
-      <tr style="background:#f8fafc;">
-        <td style="text-align:left;"><span class="risk-badge risk-med">ความเสี่ยงปานกลาง</span> (ในกลุ่มเก็บปัสสาวะ)</td>
-        <td>${rMedT}</td>
-        <td>${rMedM}</td>
-        <td><b>${rMedT + rMedM}</b></td>
-      </tr>
-      <tr style="background:#f8fafc;">
-        <td style="text-align:left;"><span class="risk-badge risk-high">ความเสี่ยงมาก/สูง</span> (ในกลุ่มเก็บปัสสาวะ)</td>
-        <td>${rHighT}</td>
-        <td>${rHighM || '-'}</td>
-        <td><b>${rHighT + rHighM}</b></td>
-      </tr>
-      <tr style="background:#dcfce7; font-weight:700; color:#15803d;">
-        <td style="text-align:left;">รวมแท็บ "รายชื่อเก็บปัสสาวะ" ทั้งหมด</td>
-        <td>${newGrpThaton + occGrpThaton}</td>
-        <td>${newGrpMae + occGrpMae}</td>
-        <td><b>${tab2Pool.length} ราย</b></td>
-      </tr>
-    `;
-  }
-
-  // 6. แยกข้อมูลผู้สัมผัสสารหนู (Env-As-01) เป็น: 1. รายตำบล, 2. ราย รพ.สต., 3. รายหมู่บ้าน
-  // 6.1 แยกรายตำบล
-  const byTambonEl = document.getElementById('dash-resp-by-tambon-body');
-  if (byTambonEl) {
-    const tambons = ['ท่าตอน', 'แม่นาวาง'];
-    let sumT1 = 0, sumT1L = 0, sumT1M = 0, sumT1H = 0;
-    let sumT2 = 0, sumT2L = 0, sumT2M = 0, sumT2H = 0;
-
-    const rows = tambons.map(tb => {
-      const p1 = tab1Pool.filter(r => r.tambon === tb);
-      const p1L = p1.filter(r => r.risk_level === 'ต่ำ').length;
-      const p1M = p1.filter(r => r.risk_level === 'ปานกลาง').length;
-      const p1H = p1.filter(r => r.risk_level === 'มาก').length;
-
-      const p2 = tab2Pool.filter(r => r.tambon === tb);
-      const p2L = p2.filter(r => r.risk_level === 'ต่ำ').length;
-      const p2M = p2.filter(r => r.risk_level === 'ปานกลาง').length;
-      const p2H = p2.filter(r => r.risk_level === 'มาก').length;
-
-      sumT1 += p1.length; sumT1L += p1L; sumT1M += p1M; sumT1H += p1H;
-      sumT2 += p2.length; sumT2L += p2L; sumT2M += p2M; sumT2H += p2H;
-
-      return `
-        <tr style="cursor:pointer;" onclick="filterRespondentsByBreakdown('${tb}','ALL','','ALL')">
-          <td style="text-align:left;"><b>ต.${tb}</b></td>
-          <td style="background:#f0f9ff;"><b>${p1.length}</b></td>
-          <td>${p1L}</td>
-          <td><span style="color:#ea580c;font-weight:700;">${p1M}</span></td>
-          <td><span style="color:#dc2626;font-weight:700;">${p1H}</span></td>
-          <td style="background:#f0fdf4;"><b>${p2.length}</b></td>
-          <td>${p2L}</td>
-          <td><span style="color:#ea580c;font-weight:700;">${p2M}</span></td>
-          <td><span style="color:#dc2626;font-weight:700;">${p2H}</span></td>
-        </tr>
-      `;
-    }).join('');
-
-    byTambonEl.innerHTML = rows + `
-      <tr style="background:#f1f5f9; font-weight:700;">
-        <td style="text-align:left;">รวมทั้ง 2 ตำบล (อ.แม่อาย)</td>
-        <td style="background:#e0f2fe; color:#0369a1;">${sumT1}</td>
-        <td>${sumT1L}</td>
-        <td>${sumT1M}</td>
-        <td>${sumT1H}</td>
-        <td style="background:#dcfce7; color:#15803d;">${sumT2}</td>
-        <td>${sumT2L}</td>
-        <td>${sumT2M}</td>
-        <td>${sumT2H}</td>
-      </tr>
-    `;
-  }
-
-  // 6.2 แยกราย รพ.สต.
-  const byHcEl = document.getElementById('dash-resp-by-hc-body');
-  if (byHcEl) {
-    const hcDefs = [
-      { hc: 'รพ.สต.บ้านท่าตอน', tambon: 'ท่าตอน' },
-      { hc: 'รพ.สต.บ้านท่ามะแกง', tambon: 'ท่าตอน' },
-      { hc: 'รพ.สต.บ้านเมืองงาม', tambon: 'ท่าตอน' },
-      { hc: 'รพ.สต.บ้านแม่เมืองน้อย', tambon: 'แม่นาวาง' }
-    ];
-    let s1 = 0, s1L = 0, s1M = 0, s1H = 0;
-    let s2 = 0, s2L = 0, s2M = 0, s2H = 0;
-
-    const rows = hcDefs.map(def => {
-      const p1 = tab1Pool.filter(r => r.health_center === def.hc);
-      const p1L = p1.filter(r => r.risk_level === 'ต่ำ').length;
-      const p1M = p1.filter(r => r.risk_level === 'ปานกลาง').length;
-      const p1H = p1.filter(r => r.risk_level === 'มาก').length;
-
-      const p2 = tab2Pool.filter(r => r.health_center === def.hc);
-      const p2L = p2.filter(r => r.risk_level === 'ต่ำ').length;
-      const p2M = p2.filter(r => r.risk_level === 'ปานกลาง').length;
-      const p2H = p2.filter(r => r.risk_level === 'มาก').length;
-
-      s1 += p1.length; s1L += p1L; s1M += p1M; s1H += p1H;
-      s2 += p2.length; s2L += p2L; s2M += p2M; s2H += p2H;
-
-      return `
-        <tr style="cursor:pointer;" onclick="filterRespondentsByBreakdown('ALL','${def.hc}','','ALL')">
-          <td style="text-align:left;"><b>${def.hc}</b></td>
-          <td>ต.${def.tambon}</td>
-          <td style="background:#f0f9ff;"><b>${p1.length}</b></td>
-          <td>${p1L}</td>
-          <td><span style="color:#ea580c;font-weight:700;">${p1M}</span></td>
-          <td><span style="color:#dc2626;font-weight:700;">${p1H}</span></td>
-          <td style="background:#f0fdf4;"><b>${p2.length}</b></td>
-          <td>${p2L}</td>
-          <td><span style="color:#ea580c;font-weight:700;">${p2M}</span></td>
-          <td><span style="color:#dc2626;font-weight:700;">${p2H}</span></td>
-        </tr>
-      `;
-    }).join('');
-
-    byHcEl.innerHTML = rows + `
-      <tr style="background:#f1f5f9; font-weight:700;">
-        <td colspan="2" style="text-align:left;">รวมทั้ง 4 รพ.สต.</td>
-        <td style="background:#e0f2fe; color:#0369a1;">${s1}</td>
-        <td>${s1L}</td>
-        <td>${s1M}</td>
-        <td>${s1H}</td>
-        <td style="background:#dcfce7; color:#15803d;">${s2}</td>
-        <td>${s2L}</td>
-        <td>${s2M}</td>
-        <td>${s2H}</td>
-      </tr>
-    `;
-  }
-
-  // 6.3 แยกรายหมู่บ้าน (เปรียบเทียบแท็บการตอบกลับ vs แท็บเก็บปัสสาวะ + ระยะเวลาสัมผัสเฉลี่ย)
-  const byMooEl = document.getElementById('dash-resp-by-moo-body');
-  if (byMooEl) {
-    const respMooMap = {};
-    tab1Pool.forEach(r => {
-      const k = `${r.tambon}|${r.moo}`;
-      if (!respMooMap[k]) {
-        respMooMap[k] = {
-          tambon: r.tambon,
-          moo: r.moo,
-          hc: r.health_center || inferHealthCenterByTambonMoo(r.tambon, r.moo),
-          t1: 0, t1L: 0, t1M: 0, t1H: 0,
-          t2: 0, t2L: 0, t2M: 0, t2H: 0,
-          expSum: 0, expCnt: 0
-        };
-      }
-      const g = respMooMap[k];
-      g.t1++;
-      if (r.risk_level === 'ต่ำ') g.t1L++;
-      else if (r.risk_level === 'ปานกลาง') g.t1M++;
-      else if (r.risk_level === 'มาก') g.t1H++;
-
-      if (r.is_urine_target) {
-        g.t2++;
-        if (r.risk_level === 'ต่ำ') g.t2L++;
-        else if (r.risk_level === 'ปานกลาง') g.t2M++;
-        else if (r.risk_level === 'มาก') g.t2H++;
-      }
-
-      const ey = parseFloat(r.exposure_years);
-      if (!isNaN(ey) && ey > 0) {
-        g.expSum += ey;
-        g.expCnt++;
-      }
-    });
-
-    const sortedRespMoo = Object.values(respMooMap).sort((a, b) => {
-      if (a.tambon !== b.tambon) return a.tambon.localeCompare(b.tambon, 'th');
-      return Number(a.moo) - Number(b.moo);
-    });
-
-    let mT1 = 0, mT1L = 0, mT1M = 0, mT1H = 0;
-    let mT2 = 0, mT2L = 0, mT2M = 0, mT2H = 0;
-    let totExpSum = 0, totExpCnt = 0;
-
-    const mooRows = sortedRespMoo.map(g => {
-      mT1 += g.t1; mT1L += g.t1L; mT1M += g.t1M; mT1H += g.t1H;
-      mT2 += g.t2; mT2L += g.t2L; mT2M += g.t2M; mT2H += g.t2H;
-      totExpSum += g.expSum; totExpCnt += g.expCnt;
-      const genOnly = g.t1 - g.t2;
-      const avgExp = g.expCnt > 0 ? (g.expSum / g.expCnt).toFixed(1) + ' ปี' : '-';
-
-      return `
-        <tr style="cursor:pointer;" onclick="filterRespondentsByBreakdown('${g.tambon}','${g.hc}','${g.moo}','ALL')">
-          <td style="text-align:left;"><b>ต.${g.tambon} หมู่ที่ ${g.moo}</b></td>
-          <td style="text-align:left;">${g.hc}</td>
-          <td style="background:#f0f9ff;"><b>${g.t1}</b></td>
-          <td>${g.t1L}</td>
-          <td><span style="color:#ea580c;font-weight:700;">${g.t1M || '-'}</span></td>
-          <td><span style="color:#dc2626;font-weight:700;">${g.t1H || '-'}</span></td>
-          <td style="background:#f0fdf4;"><b>${g.t2 || '-'}</b></td>
-          <td>${g.t2L || '-'}</td>
-          <td><span style="color:#ea580c;font-weight:700;">${g.t2M || '-'}</span></td>
-          <td><span style="color:#dc2626;font-weight:700;">${g.t2H || '-'}</span></td>
-          <td>${genOnly || '-'}</td>
-          <td><b>${avgExp}</b></td>
-        </tr>
-      `;
-    }).join('');
-
-    const grandAvgExp = totExpCnt > 0 ? (totExpSum / totExpCnt).toFixed(1) + ' ปี' : '-';
-    byMooEl.innerHTML = mooRows + `
-      <tr style="background:#f1f5f9; font-weight:700;">
-        <td colspan="2" style="text-align:left;">รวมทั้งหมด (${sortedRespMoo.length} หมู่บ้านที่มีผู้รับการคัดกรอง)</td>
-        <td style="background:#e0f2fe; color:#0369a1;">${mT1}</td>
-        <td>${mT1L}</td>
-        <td>${mT1M}</td>
-        <td>${mT1H}</td>
-        <td style="background:#dcfce7; color:#15803d;">${mT2}</td>
-        <td>${mT2L}</td>
-        <td>${mT2M}</td>
-        <td>${mT2H}</td>
-        <td>${mT1 - mT2}</td>
-        <td>${grandAvgExp}</td>
-      </tr>
-    `;
-  }
-
-  // 7. แดชบอร์ดการคัดกรองสุขภาพจิต 2Q (ในหน้าแดชบอร์ดหลัก)
-  const chart2QEl = document.getElementById('chart-2q-overview');
-  if (chart2QEl) {
-    const q2Normal = tab1Pool.filter(r => String(r.status_2q).includes('ปกติ')).length;
-    const q2Pos = tab1Pool.filter(r => String(r.status_2q).includes('พบความเสี่ยง')).length;
-    const q2Wait = tab1Pool.length - q2Normal - q2Pos;
-
-    const bars2Q = [
-      { label: 'คัดกรอง 2Q แล้ว: ปกติ (ไม่พบความเสี่ยงซึมเศร้า)', cnt: q2Normal, color: '#16a34a' },
-      { label: 'คัดกรอง 2Q แล้ว: พบความเสี่ยงซึมเศร้า (Positive 2Q -> ประเมิน 9Q ต่อ)', cnt: q2Pos, color: '#dc2626' },
-      { label: 'รอการคัดกรอง 2Q (อยู่ระหว่างดำเนินการ)', cnt: q2Wait, color: '#64748b' }
-    ];
-    chart2QEl.innerHTML = bars2Q.map(b => {
-      const pct = ((b.cnt / totalTab1) * 100).toFixed(1);
-      return `
-        <div class="bar-row" onclick="switchTab('tab-screening'); switchScreeningSubTab('2q');">
-          <div class="bar-label-line"><span>${b.label}</span><strong>${b.cnt} ราย (${pct}%)</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${b.color};"></div></div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  const dash2QHcEl = document.getElementById('dash-2q-hc-body');
-  if (dash2QHcEl) {
-    let sumAll = 0, sumScr = 0, sumNorm = 0, sumPos = 0, sumWait = 0;
-    const hcRows = hcNames.map(hc => {
-      const list = tab1Pool.filter(r => r.health_center === hc);
-      const norm = list.filter(r => String(r.status_2q).includes('ปกติ')).length;
-      const pos = list.filter(r => String(r.status_2q).includes('พบความเสี่ยง')).length;
-      const scr = norm + pos;
-      const wait = list.length - scr;
-      sumAll += list.length; sumScr += scr; sumNorm += norm; sumPos += pos; sumWait += wait;
-      return `
-        <tr>
-          <td style="text-align:left;"><b>${hc}</b></td>
-          <td><b>${list.length}</b></td>
-          <td>${scr}</td>
-          <td><span style="color:#16a34a;font-weight:700;">${norm}</span></td>
-          <td><span style="color:#dc2626;font-weight:700;">${pos}</span></td>
-          <td>${wait}</td>
-        </tr>
-      `;
-    }).join('');
-    dash2QHcEl.innerHTML = hcRows + `
-      <tr style="background:#f5f3ff; font-weight:700; color:#5b21b6;">
-        <td style="text-align:left;">รวมทั้งอำเภอแม่อาย</td>
-        <td>${sumAll}</td>
-        <td>${sumScr}</td>
-        <td>${sumNorm}</td>
-        <td>${sumPos}</td>
-        <td>${sumWait}</td>
-      </tr>
-    `;
-  }
-
-  renderPivotSummary();
-}
-
 function renderDashboard() {
   renderExecutiveDashboard();
 }
 
 // ==================== SCREENING TAB (ENV-AS-01, ENV-AS-02 & 2Q DASHBOARD + CRUD) ====================
-function renderScreeningDashboardAndTables() {
-  const totalAs01 = Math.max(1, state.respondents.length);
-  const totalAs02 = Math.max(1, state.envAs02.length);
-
-  const c1El = document.getElementById('scr-as01-count');
-  const c2El = document.getElementById('scr-as02-count');
-  const c3El = document.getElementById('scr-2q-count');
-  const q2Screened = state.respondents.filter(r => r.status_2q && r.status_2q !== 'ยังไม่คัดกรอง').length;
-
-  if (c1El) c1El.textContent = state.respondents.length;
-  if (c2El) c2El.textContent = state.envAs02.length;
-  if (c3El) c3El.textContent = `${q2Screened}/${state.respondents.length}`;
-
-  // 1. กราฟ Env-As-01 Risk
-  const scrRiskEl = document.getElementById('scr-chart-as01-risk');
-  if (scrRiskEl) {
-    const rData = [
-      { label: 'ความเสี่ยงต่ำ (0 - <10)', key: 'ต่ำ', color: '#16a34a' },
-      { label: 'ความเสี่ยงปานกลาง (10 - 20)', key: 'ปานกลาง', color: '#f97316' },
-      { label: 'ความเสี่ยงมาก/สูง (> 20)', key: 'มาก', color: '#dc2626' }
-    ];
-    scrRiskEl.innerHTML = rData.map(item => {
-      const cnt = state.respondents.filter(r => r.risk_level === item.key).length;
-      const pct = ((cnt / totalAs01) * 100).toFixed(1);
-      return `
-        <div class="bar-row">
-          <div class="bar-label-line"><span>${item.label}</span><strong>${cnt} ราย (${pct}%)</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${item.color};"></div></div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 2. กราฟพฤติกรรมเสี่ยงสูงสุดจาก 11 ข้อใน Env-As-01
-  const scrQuestionsEl = document.getElementById('scr-chart-as01-questions');
-  if (scrQuestionsEl) {
-    const qLabels = [
-      { key: 'q7', label: 'ข้อ 7: พักอาศัยในพื้นที่ > 5 ปี' },
-      { key: 'q6', label: 'ข้อ 6: บ้านอยู่ในรัศมี 1 กม. จากแม่น้ำกก' },
-      { key: 'q2', label: 'ข้อ 2: ดื่ม/ใช้น้ำบ่อตื้น/บาดาลประกอบอาหาร' },
-      { key: 'q11', label: 'ข้อ 11: กินพืชผักที่ปลูกริมน้ำกกประจำ' },
-      { key: 'q5', label: 'ข้อ 5: ทำงานสัมผัสน้ำจากแม่น้ำปนเปื้อน' },
-      { key: 'q10', label: 'ข้อ 10: เคยมีน้ำหลากเข้าบ้านในรอบ 5 ปี' }
-    ];
-    scrQuestionsEl.innerHTML = qLabels.map(q => {
-      const cnt = state.respondents.filter(r => Number(r[q.key]) === 1).length;
-      const pct = ((cnt / totalAs01) * 100).toFixed(1);
-      return `
-        <div class="bar-row">
-          <div class="bar-label-line"><span>${q.label}</span><strong>${cnt} ราย (${pct}%)</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:#0284c7;"></div></div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 3. กราฟสรุป Env-As-02 (ก่อนเก็บตัวอย่างทางชีวภาพ 90 ราย)
-  const scrAs02El = document.getElementById('scr-chart-as02-summary');
-  if (scrAs02El) {
-    const within1km = state.envAs02.filter(x => String(x.within_1km_river).includes('ใช่')).length;
-    const drinkWell = state.envAs02.filter(x => String(x.drink_sources).includes('บ่อ')).length;
-    const growVeg = state.envAs02.filter(x => String(x.food_veg).includes('ปลูกเอง') || String(x.eat_river_veg_weekly).includes('ใช่')).length;
-    const seafood3d = state.envAs02.filter(x => String(x.seafood_3days).includes('ใช่') && !String(x.seafood_3days).includes('ไม่ใช่')).length;
-    const herbUse = state.envAs02.filter(x => x.herb_usage && !String(x.herb_usage).includes('ไม่ได้กิน')).length;
-
-    const metrics = [
-      { label: 'พักในรัศมี 1 กม. จากแม่น้ำปนเปื้อน', cnt: within1km, color: '#0f766e' },
-      { label: 'ดื่มน้ำจากบ่อน้ำตื้น/บ่อบาดาล', cnt: drinkWell, color: '#d97706' },
-      { label: 'กินพืชผักปลูกเอง/ริมน้ำปนเปื้อน', cnt: growVeg, color: '#16a34a' },
-      { label: 'กินอาหารทะเลใน 3 วันก่อนตรวจปัสสาวะ', cnt: seafood3d, color: '#e11d48' },
-      { label: 'ใช้ยาสมุนไพร/ยาลูกกลอนใน 3 เดือน', cnt: herbUse, color: '#7c3aed' }
-    ];
-
-    scrAs02El.innerHTML = metrics.map(m => {
-      const pct = ((m.cnt / totalAs02) * 100).toFixed(1);
-      return `
-        <div class="bar-row">
-          <div class="bar-label-line"><span>${m.label}</span><strong>${m.cnt} ราย (${pct}%)</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${m.color};"></div></div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 4. กราฟสรุปคัดกรองสุขภาพจิต 2Q ในหน้าแท็บคัดกรอง
-  const scr2QEl = document.getElementById('scr-chart-2q-summary');
-  if (scr2QEl) {
-    const q2Normal = state.respondents.filter(r => String(r.status_2q).includes('ปกติ')).length;
-    const q2Pos = state.respondents.filter(r => String(r.status_2q).includes('พบความเสี่ยง')).length;
-    const q2Wait = state.respondents.length - q2Normal - q2Pos;
-    const q1Yes = state.respondents.filter(r => r.q2_1 === 'ใช่').length;
-    const q2Yes = state.respondents.filter(r => r.q2_2 === 'ใช่').length;
-
-    const items2Q = [
-      { label: 'คัดกรอง 2Q ปกติ (ไม่พบความเสี่ยง)', cnt: q2Normal, color: '#16a34a' },
-      { label: 'พบความเสี่ยงโรคซึมเศร้า (Positive 2Q)', cnt: q2Pos, color: '#dc2626' },
-      { label: 'ตอบ "ใช่" ข้อ 1 (รู้สึกหดหู่/เศร้า/ท้อแท้)', cnt: q1Yes, color: '#7c3aed' },
-      { label: 'ตอบ "ใช่" ข้อ 2 (รู้สึกเบื่อ/ไม่เพลิดเพลิน)', cnt: q2Yes, color: '#ea580c' },
-      { label: 'รอการคัดกรอง 2Q', cnt: q2Wait, color: '#64748b' }
-    ];
-    scr2QEl.innerHTML = items2Q.map(m => {
-      const pct = ((m.cnt / totalAs01) * 100).toFixed(1);
-      return `
-        <div class="bar-row">
-          <div class="bar-label-line"><span>${m.label}</span><strong>${m.cnt} ราย (${pct}%)</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${m.color};"></div></div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  renderScreeningAs01Table();
-  renderScreeningAs02Table();
-  renderScreening2QTable();
-}
-
-function renderScreeningAs01Table() {
-  const tbody = document.getElementById('scr-as01-tbody');
-  if (!tbody) return;
-  const q = (document.getElementById('scr-as01-search').value || '').toLowerCase().trim();
-  const tabSel = document.getElementById('scr-as01-tab') ? document.getElementById('scr-as01-tab').value : 'ALL';
-  const risk = document.getElementById('scr-as01-risk').value;
-
-  const filtered = state.respondents.filter(r => {
-    if ((tabSel === 'TARGET_90' || tabSel === 'TARGET_130') && !r.is_urine_target) return false;
-    if (tabSel === 'GENERAL_153' && r.is_urine_target) return false;
-    if (risk !== 'ALL' && r.risk_level !== risk) return false;
-    if (q) {
-      const hay = `${r.code} ${r.full_name} ${r.cid} ${r.house_no} ${r.tambon} ${r.health_center} ${r.source_tab}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
-  tbody.innerHTML = filtered.map(r => {
-    let badgeClass = 'risk-low';
-    if (r.risk_level === 'ปานกลาง') badgeClass = 'risk-med';
-    else if (r.risk_level === 'มาก') badgeClass = 'risk-high';
-
-    const tabBadge = r.is_urine_target
-      ? `<span class="badge" style="background:#dcfce7;color:#15803d;font-size:11px;">เก็บปัสสาวะ (90)</span>`
-      : `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">การตอบกลับ (153)</span>`;
-
-    return `
-      <tr>
-        <td><b>${r.code || r.id}</b><div style="margin-top:2px;">${tabBadge}</div></td>
-        <td>${r.survey_date || '2026-05-22'}<br/><small style="color:#64748b;">${r.interviewer_name || ''}</small></td>
-        <td><b>${r.full_name}</b></td>
-        <td>${r.age || '-'} ปี / ${r.gender ? r.gender.replace('1) ', '').replace('2) ', '') : '-'}</td>
-        <td>${r.cid || '-'}</td>
-        <td>บ้าน ${r.house_no || '-'} ม.${r.moo} ต.${r.tambon}<br/><small style="color:#0f766e;">${r.health_center || ''}</small></td>
-        <td>${r.risk_job_type || 'ไม่ใช่'} ${r.job_detail ? `<small>(${r.job_detail})</small>` : ''}</td>
-        <td class="text-center">
-          <b>${r.exposure_years !== '' && r.exposure_years !== undefined ? r.exposure_years + ' ปี' : '-'}</b>
-          <div style="font-size:11px; color:#64748b;">อาศัย ${r.years_in_area || '-'} ปี</div>
-        </td>
-        <td>
-          <div>โรค: ${r.diseases || 'ไม่มี'}</div>
-          ${r.symptoms ? `<div style="color:#dc2626;font-size:11.5px;">อาการ: ${r.symptoms}</div>` : ''}
-        </td>
-        <td><b>${r.total_score}</b> / 30.5</td>
-        <td><span class="risk-badge ${badgeClass}">${r.risk_level}</span></td>
-        <td>
-          <a href="javascript:void(0)" onclick="open2QModal('${r.id}')" style="text-decoration:none;" title="คลิกเพื่อบันทึก/แก้ไขผลคัดกรอง 2Q">
-            ${format2QBadge(r.status_2q)}
-          </a>
-        </td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-sm btn-primary" onclick="openRespondentModal('${r.id}')" title="แก้ไข Env-As-01"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-sm btn-outline" style="color:#7c3aed; border-color:#c4b5fd;" onclick="open2QModal('${r.id}')" title="คัดกรองสุขภาพจิต 2Q"><i class="fa-solid fa-brain"></i> 2Q</button>
-          <button class="btn btn-sm btn-success" onclick="openEnvAs02ForRespondent('${r.id}')" title="ซักประวัติต่อใน Env-As-02"><i class="fa-solid fa-vial"></i></button>
-          <button class="btn btn-sm btn-danger" onclick="deleteRespondent('${r.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function renderScreeningAs02Table() {
-  const tbody = document.getElementById('scr-as02-tbody');
-  if (!tbody) return;
-  const q = (document.getElementById('scr-as02-search').value || '').toLowerCase().trim();
-
-  const filtered = state.envAs02.filter(item => {
-    if (!q) return true;
-    const hay = `${item.form_no} ${item.full_name} ${item.phone} ${item.tambon} ${item.health_center}`.toLowerCase();
-    return hay.includes(q);
-  });
-
-  tbody.innerHTML = filtered.map(item => `
-    <tr>
-      <td><b>${item.form_no}</b></td>
-      <td>${item.interview_date || '2026-05-22'}</td>
-      <td><b>${item.full_name}</b></td>
-      <td>${item.age || '-'} ปี | ${item.weight_kg || '-'} กก. / ${item.height_cm || '-'} ซม.</td>
-      <td>${item.phone || '-'}</td>
-      <td>บ้าน ${item.house_no || '-'} ม.${item.moo} ต.${item.tambon} (${item.within_1km_river})</td>
-      <td class="text-center">
-        <b>${item.exposure_years !== '' && item.exposure_years !== undefined ? item.exposure_years + ' ปี' : (item.years_in_area ? item.years_in_area + ' ปี' : '-')}</b>
-      </td>
-      <td>สมุนไพร: ${item.herb_usage}<br/><small>บุหรี่: ${item.smoking_status} | สุรา: ${item.alcohol_status}</small></td>
-      <td>${item.seafood_freq}<br/><b>3 วันก่อนตรวจ: ${item.seafood_3days}</b></td>
-      <td>ดื่ม: ${item.drink_sources} ${item.drink_years ? `(${item.drink_years} ปี)` : ''}<br/><small>ใช้: ${item.use_sources} ${item.use_years ? `(${item.use_years} ปี)` : ''}</small></td>
-      <td>
-        <a href="javascript:void(0)" onclick="open2QModalForAs02('${item.id}')" style="text-decoration:none;">
-          ${format2QBadge(item.status_2q)}
-        </a>
-      </td>
-      <td>${item.interviewer_name || '-'}<br/><small>${item.health_center || '-'}</small></td>
-      <td style="white-space:nowrap;">
-        <button class="btn btn-sm btn-primary" onclick="openEnvAs02Modal('${item.id}')" title="แก้ไข Env-As-02"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-sm btn-outline" style="color:#7c3aed; border-color:#c4b5fd;" onclick="open2QModalForAs02('${item.id}')" title="คัดกรอง 2Q"><i class="fa-solid fa-brain"></i> 2Q</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteEnvAs02('${item.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-function renderScreening2QTable() {
-  const tbody = document.getElementById('scr-2q-tbody');
-  if (!tbody) return;
-  const q = (document.getElementById('scr-2q-search')?.value || '').toLowerCase().trim();
-  const tabSel = document.getElementById('scr-2q-tab')?.value || 'ALL';
-  const hcSel = document.getElementById('scr-2q-hc')?.value || 'ALL';
-  const stSel = document.getElementById('scr-2q-status')?.value || 'ALL';
-
-  const filtered = state.respondents.filter(r => {
-    if (tabSel === 'TARGET_90' && !r.is_urine_target) return false;
-    if (tabSel === 'GENERAL_153' && r.is_urine_target) return false;
-    if (hcSel !== 'ALL' && r.health_center !== hcSel) return false;
-    if (stSel !== 'ALL' && (r.status_2q || 'ยังไม่คัดกรอง') !== stSel) return false;
-    if (q) {
-      const hay = `${r.code} ${r.full_name} ${r.cid} ${r.tambon} ${r.health_center} ${r.status_2q}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
-  tbody.innerHTML = filtered.map((r, idx) => {
-    const tabBadge = r.is_urine_target
-      ? `<span class="badge" style="background:#dcfce7;color:#15803d;font-size:11px;">เก็บปัสสาวะ (90)</span>`
-      : `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">การตอบกลับ (153)</span>`;
-    let riskCls = 'risk-low';
-    if (r.risk_level === 'ปานกลาง') riskCls = 'risk-med';
-    if (r.risk_level === 'มาก') riskCls = 'risk-high';
-
-    const q1Badge = r.q2_1 === 'ใช่'
-      ? `<span style="color:#dc2626;font-weight:700;">1. ใช่</span>`
-      : `<span style="color:#16a34a;">0. ไม่ใช่</span>`;
-    const q2Badge = r.q2_2 === 'ใช่'
-      ? `<span style="color:#dc2626;font-weight:700;">1. ใช่</span>`
-      : `<span style="color:#16a34a;">0. ไม่ใช่</span>`;
-
-    return `
-      <tr>
-        <td>${r.seq || (idx + 1)}</td>
-        <td><b>${r.code || '-'}</b><div>${tabBadge}</div></td>
-        <td><b>${r.full_name}</b></td>
-        <td>${r.age || '-'} ปี / ${r.gender ? r.gender.replace('1) ', '').replace('2) ', '') : '-'}</td>
-        <td>บ้าน ${r.house_no || '-'} ม.${r.moo} ต.${r.tambon}</td>
-        <td>${r.health_center || '-'}</td>
-        <td class="text-center"><b>${r.exposure_years !== '' && r.exposure_years !== undefined ? r.exposure_years + ' ปี' : '-'}</b></td>
-        <td><span class="risk-badge ${riskCls}">${r.risk_level} (${r.total_score})</span></td>
-        <td class="text-center">${r.status_2q === 'ยังไม่คัดกรอง' ? '<span class="text-muted">-</span>' : q1Badge}</td>
-        <td class="text-center">${r.status_2q === 'ยังไม่คัดกรอง' ? '<span class="text-muted">-</span>' : q2Badge}</td>
-        <td>${format2QBadge(r.status_2q)}</td>
-        <td>${r.date_2q || '<span class="text-muted">ยังไม่ระบุ</span>'}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-sm btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="open2QModal('${r.id}')">
-            <i class="fa-solid fa-brain"></i> คัดกรอง 2Q
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-// ==================== 2Q MENTAL HEALTH SCREENING MODAL & LOGIC ====================
 function recalcModalAs01_2Q() {
   const q1 = document.getElementById('resp-q2-1')?.value || 'ไม่ใช่';
   const q2 = document.getElementById('resp-q2-2')?.value || 'ไม่ใช่';
@@ -1869,7 +765,7 @@ function open2QModal(respId = null) {
     ).join('');
 
   document.getElementById('form-2q').reset();
-  document.getElementById('q2-modal-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('q2-modal-date').value = bangkokToday();
   document.getElementById('q2-modal-assessor').value = state.currentUser ? state.currentUser.displayName : 'เจ้าหน้าที่สาธารณสุข อ.แม่อาย';
 
   const targetId = respId || (state.respondents[0] ? state.respondents[0].id : '');
@@ -1878,21 +774,6 @@ function open2QModal(respId = null) {
     onSelect2QRespondent(targetId);
   }
   modal.style.display = 'flex';
-}
-
-function open2QModalForAs02(as02Id) {
-  const item = state.envAs02.find(x => x.id === as02Id);
-  if (!item) return;
-  const matchResp = state.respondents.find(r =>
-    (item.code && r.code === item.code) ||
-    (item.cid && r.cid === item.cid) ||
-    (item.full_name && r.full_name === item.full_name)
-  );
-  if (matchResp) {
-    open2QModal(matchResp.id);
-  } else {
-    open2QModal(null);
-  }
 }
 
 function close2QModal() {
@@ -1981,11 +862,7 @@ async function handleSave2QModal(e) {
     state.respondents[idx].note_2q = note2q;
 
     const rRef = state.respondents[idx];
-    const as02Idx = state.envAs02.findIndex(x =>
-      (x.code && x.code === rRef.code) ||
-      (x.cid && x.cid === rRef.cid) ||
-      (x.full_name && x.full_name === rRef.full_name)
-    );
+    const as02Idx = state.envAs02.findIndex(x => x.respondent_id === rRef.id);
     if (as02Idx >= 0) {
       state.envAs02[as02Idx].q2_1 = q1;
       state.envAs02[as02Idx].q2_2 = q2;
@@ -1998,36 +875,6 @@ async function handleSave2QModal(e) {
   }
 }
 
-function export2QCsv() {
-  const headers = [
-    'ลำดับ', 'รหัส(code)', 'แท็บข้อมูล', 'ชื่อ-นามสกุล', 'อายุ', 'เพศ', 'หมู่ที่', 'ตำบล', 'รพ.สต.',
-    'ระยะเวลาที่สัมผัส(ปี)', 'คะแนนความเสี่ยงสารหนู', 'ระดับความเสี่ยง',
-    '2Q_ข้อ1_หดหู่เศร้าท้อแท้', '2Q_ข้อ2_เบื่อไม่เพลิดเพลิน', 'สรุปผลคัดกรอง_2Q', 'วันที่คัดกรอง_2Q', 'ผู้ประเมิน_2Q', 'หมายเหตุ_2Q'
-  ];
-  const rows = state.respondents.map((r, i) => [
-    r.seq || (i + 1),
-    `"${r.code || ''}"`,
-    `"${r.source_tab || ''}"`,
-    `"${r.full_name || ''}"`,
-    r.age || '',
-    `"${r.gender || ''}"`,
-    r.moo || '',
-    `"${r.tambon || ''}"`,
-    `"${r.health_center || ''}"`,
-    r.exposure_years !== undefined ? r.exposure_years : '',
-    r.total_score || 0,
-    `"${r.risk_level || ''}"`,
-    `"${r.q2_1 || 'ไม่ใช่'}"`,
-    `"${r.q2_2 || 'ไม่ใช่'}"`,
-    `"${r.status_2q || 'ยังไม่คัดกรอง'}"`,
-    `"${r.date_2q || ''}"`,
-    `"${r.assessor_2q || ''}"`,
-    `"${r.note_2q || ''}"`
-  ]);
-  downloadCsvFile('Mental_Health_2Q_Screening_MaeAi.csv', [headers.join(','), ...rows.map(r => r.join(','))].join('\n'));
-}
-
-// ==================== ENV-AS-02 MODAL & CRUD ====================
 function populateAs02RespondentDropdown() {
   const sel = document.getElementById('as02-fill-from-resp');
   if (!sel) return;
@@ -2040,28 +887,28 @@ function autofillAs02FromRespondent(respId) {
   if (!r) return;
   document.getElementById('as02-name').value = r.full_name || '';
   document.getElementById('as02-age').value = r.age || '';
-  setSelectOrOther('as02-gender', 'as02-gender-other-wrap', 'as02-gender-other', r.gender || '1) ชาย');
+  setSelectOrOther('as02-gender', 'as02-gender-other-wrap', 'as02-gender-other', r.gender ?? '');
   document.getElementById('as02-cid').value = r.cid || '';
   document.getElementById('as02-house').value = r.house_no || '';
   document.getElementById('as02-moo').value = r.moo || '';
   setSelectOrOther('as02-tambon', 'as02-tambon-other-wrap', 'as02-tambon-other', r.tambon || 'ท่าตอน');
-  setSelectOrOther('as02-marital', 'as02-marital-other-wrap', 'as02-marital-other', r.marital_status || '2) คู่');
-  setSelectOrOther('as02-edu', 'as02-edu-other-wrap', 'as02-edu-other', r.education || '1) ไม่ได้เรียนหนังสือ');
+  setSelectOrOther('as02-marital', 'as02-marital-other-wrap', 'as02-marital-other', r.marital_status ?? '');
+  setSelectOrOther('as02-edu', 'as02-edu-other-wrap', 'as02-edu-other', r.education ?? '');
   document.getElementById('as02-years').value = r.years_in_area || '';
   if (document.getElementById('as02-exposure-years')) {
     document.getElementById('as02-exposure-years').value = r.exposure_years !== undefined ? r.exposure_years : '';
   }
   document.getElementById('as02-well-id').value = r.well_id || '';
-  document.getElementById('as02-within-1km').value = r.q6 ? '1.ใช่' : '2.ไม่ใช่';
-  if (document.getElementById('as02-job-flag')) document.getElementById('as02-job-flag').value = r.risk_job_flag || 'ไม่ใช่';
+  document.getElementById('as02-within-1km').value = r.q6 == null ? '' : r.q6 ? '1.ใช่' : '2.ไม่ใช่';
+  if (document.getElementById('as02-job-flag')) document.getElementById('as02-job-flag').value = r.risk_job_flag ?? '';
   document.getElementById('as02-job-type').value = r.risk_job_type || '';
   populateCheckboxesFromString('as02-occ-chk', r.risk_job_type);
   document.getElementById('as02-job-detail').value = `${r.job_detail || ''} ${r.job_duration ? '(' + r.job_duration + ')' : ''}`.trim();
-  document.getElementById('as02-diseases').value = r.diseases || 'ไม่มี';
-  document.getElementById('as02-eat-river-veg').value = r.q11 ? '1.ใช่' : '2.ไม่ใช่';
-  document.getElementById('as02-flood-5y').value = r.q10 ? '1.เคย' : '2.ไม่เคย';
-  if (document.getElementById('as02-q2-1')) document.getElementById('as02-q2-1').value = r.q2_1 || 'ไม่ใช่';
-  if (document.getElementById('as02-q2-2')) document.getElementById('as02-q2-2').value = r.q2_2 || 'ไม่ใช่';
+  document.getElementById('as02-diseases').value = r.diseases ?? '';
+  document.getElementById('as02-eat-river-veg').value = r.q11 == null ? '' : r.q11 ? '1.ใช่' : '2.ไม่ใช่';
+  document.getElementById('as02-flood-5y').value = r.q10 == null ? '' : r.q10 ? '1.เคย' : '2.ไม่เคย';
+  if (document.getElementById('as02-q2-1')) document.getElementById('as02-q2-1').value = r.q2_1 || '';
+  if (document.getElementById('as02-q2-2')) document.getElementById('as02-q2-2').value = r.q2_2 || '';
   if (document.getElementById('as02-status-2q')) document.getElementById('as02-status-2q').value = r.status_2q || 'ยังไม่คัดกรอง';
 }
 
@@ -2071,7 +918,7 @@ function openEnvAs02ForRespondent(respId) {
   autofillAs02FromRespondent(respId);
 }
 
-function openEnvAs02Modal(id = null) {
+function openDetailedEnvAs02(id = null) {
   populateAs02RespondentDropdown();
   const modal = document.getElementById('env-as02-modal');
   const title = document.getElementById('as02-modal-title');
@@ -2082,69 +929,69 @@ function openEnvAs02Modal(id = null) {
   if (id) {
     const item = state.envAs02.find(x => x.id === id);
     if (!item) return;
-    title.innerHTML = `<i class="fa-solid fa-vial-circle-check"></i> แก้ไขแบบฟอร์ม Env-As-02 (${item.form_no}: ${item.full_name})`;
+    title.innerHTML = `<i class="fa-solid fa-vial-circle-check"></i> แก้ไขแบบฟอร์ม Env-As-02 (${item.form_no || item.code || item.id}: ${item.full_name})`;
     document.getElementById('as02-id').value = item.id;
-    document.getElementById('as02-form-no').value = item.form_no || '';
-    document.getElementById('as02-date').value = item.interview_date || '2026-10-27';
-    document.getElementById('as02-well-id').value = item.well_id || '';
-    document.getElementById('as02-name').value = item.full_name || '';
-    document.getElementById('as02-age').value = item.age || '';
-    document.getElementById('as02-phone').value = item.phone || '';
-    document.getElementById('as02-cid').value = item.cid || '';
-    setSelectOrOther('as02-gender', 'as02-gender-other-wrap', 'as02-gender-other', item.gender || '1) ชาย');
-    document.getElementById('as02-weight').value = item.weight_kg || '';
-    document.getElementById('as02-height').value = item.height_cm || '';
-    document.getElementById('as02-house').value = item.house_no || '';
-    document.getElementById('as02-moo').value = item.moo || '';
-    setSelectOrOther('as02-tambon', 'as02-tambon-other-wrap', 'as02-tambon-other', item.tambon || 'ท่าตอน');
-    setSelectOrOther('as02-marital', 'as02-marital-other-wrap', 'as02-marital-other', item.marital_status || '2) คู่');
-    setSelectOrOther('as02-edu', 'as02-edu-other-wrap', 'as02-edu-other', item.education || '1) ไม่ได้เรียนหนังสือ');
-    document.getElementById('as02-years').value = item.years_in_area || '';
+    document.getElementById('as02-form-no').value = item.form_no ?? '';
+    document.getElementById('as02-date').value = item.interview_date ?? '';
+    document.getElementById('as02-well-id').value = item.well_id ?? '';
+    document.getElementById('as02-name').value = item.full_name ?? '';
+    document.getElementById('as02-age').value = item.age ?? '';
+    document.getElementById('as02-phone').value = item.phone ?? '';
+    document.getElementById('as02-cid').value = item.cid ?? '';
+    setSelectOrOther('as02-gender', 'as02-gender-other-wrap', 'as02-gender-other', item.gender ?? '');
+    document.getElementById('as02-weight').value = item.weight_kg ?? '';
+    document.getElementById('as02-height').value = item.height_cm ?? '';
+    document.getElementById('as02-house').value = item.house_no ?? '';
+    document.getElementById('as02-moo').value = item.moo ?? '';
+    setSelectOrOther('as02-tambon', 'as02-tambon-other-wrap', 'as02-tambon-other', item.tambon ?? '');
+    setSelectOrOther('as02-marital', 'as02-marital-other-wrap', 'as02-marital-other', item.marital_status ?? '');
+    setSelectOrOther('as02-edu', 'as02-edu-other-wrap', 'as02-edu-other', item.education ?? '');
+    document.getElementById('as02-years').value = item.years_in_area ?? '';
     if (document.getElementById('as02-exposure-years')) {
-      document.getElementById('as02-exposure-years').value = item.exposure_years !== undefined ? item.exposure_years : (item.years_in_area || '');
+      document.getElementById('as02-exposure-years').value = item.exposure_years !== undefined ? item.exposure_years : (item.years_in_area ?? '');
     }
-    document.getElementById('as02-hours-home').value = item.hours_at_home || 12;
-    document.getElementById('as02-out-district').value = item.work_out_district || 'ไม่ใช่';
-    document.getElementById('as02-out-days').value = item.work_out_days || 0;
-    document.getElementById('as02-within-1km').value = item.within_1km_river || '1.ใช่';
-    if (document.getElementById('as02-job-flag')) document.getElementById('as02-job-flag').value = item.risk_job_flag || (item.risk_job_type ? 'ใช่' : 'ไม่ใช่');
-    document.getElementById('as02-job-type').value = item.risk_job_type || '';
+    document.getElementById('as02-hours-home').value = item.hours_at_home ?? '';
+    document.getElementById('as02-out-district').value = item.work_out_district ?? '';
+    document.getElementById('as02-out-days').value = item.work_out_days ?? '';
+    document.getElementById('as02-within-1km').value = item.within_1km_river ?? '';
+    if (document.getElementById('as02-job-flag')) document.getElementById('as02-job-flag').value = item.risk_job_flag ?? '';
+    document.getElementById('as02-job-type').value = item.risk_job_type ?? '';
     populateCheckboxesFromString('as02-occ-chk', item.risk_job_type);
-    document.getElementById('as02-job-detail').value = item.job_detail || '';
-    document.getElementById('as02-diseases').value = item.diseases || '';
-    setSelectOrOther('as02-herb', 'as02-herb-other-wrap', 'as02-herb-other', item.herb_usage || '5. ไม่ได้กิน');
-    document.getElementById('as02-herb-name').value = item.herb_name || '';
-    setSelectOrOther('as02-smoking', 'as02-smoking-other-wrap', 'as02-smoking-other', item.smoking_status || '1. ไม่สูบ');
-    if (document.getElementById('as02-smoking-detail')) document.getElementById('as02-smoking-detail').value = item.smoking_detail || '';
-    setSelectOrOther('as02-alcohol', 'as02-alcohol-other-wrap', 'as02-alcohol-other', item.alcohol_status || '1. ไม่ดื่ม');
-    document.getElementById('as02-seafood-freq').value = item.seafood_freq || '5. ไม่ได้กิน';
-    document.getElementById('as02-seafood-3days').value = item.seafood_3days || '2. ไม่ใช่';
-    document.getElementById('as02-drink-sources').value = item.drink_sources || '';
+    document.getElementById('as02-job-detail').value = item.job_detail ?? '';
+    document.getElementById('as02-diseases').value = item.diseases ?? '';
+    setSelectOrOther('as02-herb', 'as02-herb-other-wrap', 'as02-herb-other', item.herb_usage ?? '');
+    document.getElementById('as02-herb-name').value = item.herb_name ?? '';
+    setSelectOrOther('as02-smoking', 'as02-smoking-other-wrap', 'as02-smoking-other', item.smoking_status ?? '');
+    if (document.getElementById('as02-smoking-detail')) document.getElementById('as02-smoking-detail').value = item.smoking_detail ?? '';
+    setSelectOrOther('as02-alcohol', 'as02-alcohol-other-wrap', 'as02-alcohol-other', item.alcohol_status ?? '');
+    document.getElementById('as02-seafood-freq').value = item.seafood_freq ?? '';
+    document.getElementById('as02-seafood-3days').value = item.seafood_3days ?? '';
+    document.getElementById('as02-drink-sources').value = item.drink_sources ?? '';
     populateCheckboxesFromString('as02-drk-chk', item.drink_sources);
-    if (document.getElementById('as02-drink-years')) document.getElementById('as02-drink-years').value = item.drink_years || '';
-    document.getElementById('as02-use-sources').value = item.use_sources || '';
+    if (document.getElementById('as02-drink-years')) document.getElementById('as02-drink-years').value = item.drink_years ?? '';
+    document.getElementById('as02-use-sources').value = item.use_sources ?? '';
     populateCheckboxesFromString('as02-use-chk', item.use_sources);
-    if (document.getElementById('as02-use-years')) document.getElementById('as02-use-years').value = item.use_years || '';
-    setSelectOrOther('as02-food-rice', 'as02-rice-other-wrap', 'as02-rice-other', item.food_rice || 'ปลูกเอง');
-    setSelectOrOther('as02-food-veg', 'as02-veg-other-wrap', 'as02-veg-other', item.food_veg || 'ปลูกเอง');
-    setSelectOrOther('as02-food-fish', 'as02-fish-other-wrap', 'as02-fish-other', item.food_fish || 'ซื้อจากตลาด หรือรถพุ่มพวง');
-    setSelectOrOther('as02-food-snail', 'as02-snail-other-wrap', 'as02-snail-other', item.food_snail || 'ซื้อจากตลาด หรือรถพุ่มพวง');
-    document.getElementById('as02-home-veg').value = item.home_grown_veg || '';
-    setSelectOrOther('as02-home-water', 'as02-home-water-other-wrap', 'as02-home-water-other', item.home_grown_water || '3. บ่อน้ำบาดาล');
-    document.getElementById('as02-eat-river-veg').value = item.eat_river_veg_weekly || '2.ไม่ใช่';
-    document.getElementById('as02-flood-5y').value = item.flood_5years || '2.ไม่เคย';
-    if (document.getElementById('as02-q2-1')) document.getElementById('as02-q2-1').value = item.q2_1 || 'ไม่ใช่';
-    if (document.getElementById('as02-q2-2')) document.getElementById('as02-q2-2').value = item.q2_2 || 'ไม่ใช่';
-    if (document.getElementById('as02-status-2q')) document.getElementById('as02-status-2q').value = item.status_2q || 'ยังไม่คัดกรอง';
-    document.getElementById('as02-interviewer').value = item.interviewer_name || 'เจ้าหน้าที่สาธารณสุข';
-    if (document.getElementById('as02-role')) document.getElementById('as02-role').value = item.interviewer_role || 'นักวิชาการสาธารณสุข';
-    setSelectOrOther('as02-hc', 'as02-hc-other-wrap', 'as02-hc-other', item.health_center || 'รพ.สต.บ้านท่าตอน');
+    if (document.getElementById('as02-use-years')) document.getElementById('as02-use-years').value = item.use_years ?? '';
+    setSelectOrOther('as02-food-rice', 'as02-rice-other-wrap', 'as02-rice-other', item.food_rice ?? '');
+    setSelectOrOther('as02-food-veg', 'as02-veg-other-wrap', 'as02-veg-other', item.food_veg ?? '');
+    setSelectOrOther('as02-food-fish', 'as02-fish-other-wrap', 'as02-fish-other', item.food_fish ?? '');
+    setSelectOrOther('as02-food-snail', 'as02-snail-other-wrap', 'as02-snail-other', item.food_snail ?? '');
+    document.getElementById('as02-home-veg').value = item.home_grown_veg ?? '';
+    setSelectOrOther('as02-home-water', 'as02-home-water-other-wrap', 'as02-home-water-other', item.home_grown_water ?? '');
+    document.getElementById('as02-eat-river-veg').value = item.eat_river_veg_weekly ?? '';
+    document.getElementById('as02-flood-5y').value = item.flood_5years ?? '';
+    if (document.getElementById('as02-q2-1')) document.getElementById('as02-q2-1').value = item.q2_1 ?? '';
+    if (document.getElementById('as02-q2-2')) document.getElementById('as02-q2-2').value = item.q2_2 ?? '';
+    if (document.getElementById('as02-status-2q')) document.getElementById('as02-status-2q').value = item.status_2q ?? '';
+    document.getElementById('as02-interviewer').value = item.interviewer_name ?? '';
+    if (document.getElementById('as02-role')) document.getElementById('as02-role').value = item.interviewer_role ?? '';
+    setSelectOrOther('as02-hc', 'as02-hc-other-wrap', 'as02-hc-other', item.health_center ?? '');
   } else {
     title.innerHTML = `<i class="fa-solid fa-vial-circle-check"></i> บันทึกแบบฟอร์ม Env-As-02 ใหม่ (ก่อนเก็บตัวอย่างทางชีวภาพ)`;
     const nextNum = state.envAs02.length + 1;
     document.getElementById('as02-id').value = `AS02-${String(nextNum).padStart(3, '0')}`;
     document.getElementById('as02-form-no').value = `69-${String(nextNum).padStart(4, '0')}`;
-    document.getElementById('as02-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('as02-date').value = bangkokToday();
     if (document.getElementById('as02-exposure-years')) document.getElementById('as02-exposure-years').value = '';
   }
   modal.style.display = 'flex';
@@ -2166,6 +1013,10 @@ async function handleSaveEnvAs02(e) {
   if (q21 === 'ใช่' || q22 === 'ใช่') status2q = 'พบความเสี่ยง (Positive 2Q)';
 
   const obj = {
+    ...(state.envAs02.find(x => x.id === id) || {}),
+    history_updated: true,
+    history_complete: Boolean(document.getElementById('as02-date').value && document.getElementById('as02-interviewer').value.trim()),
+    respondent_id: document.getElementById('as02-fill-from-resp').value || (state.envAs02.find(x => x.id === id)?.respondent_id || ''),
     id: id,
     form_no: document.getElementById('as02-form-no').value.trim(),
     well_id: document.getElementById('as02-well-id').value.trim(),
@@ -2290,7 +1141,7 @@ function populateWellDropdowns() {
     labFilterWellSel.value = currentLabFilterVal;
   }
   if (labModalWellSel) {
-    labModalWellSel.innerHTML = optionsHtml;
+    labModalWellSel.innerHTML = '<option value="">-- ยังไม่ยืนยันการจับคู่ทะเบียน --</option>' + optionsHtml;
     if (currentLabModalVal) labModalWellSel.value = currentLabModalVal;
   }
 }
@@ -2494,77 +1345,6 @@ function closeWellGalleryModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function renderWellsTable() {
-  const tbody = document.getElementById('wells-table-body');
-  if (!tbody) return;
-
-  const q = (document.getElementById('well-search').value || '').toLowerCase().trim();
-  const tambon = document.getElementById('well-filter-tambon').value;
-  const wType = document.getElementById('well-filter-type').value;
-  const dist = document.getElementById('well-filter-dist').value;
-  const hc = document.getElementById('well-filter-hc').value;
-
-  const filtered = state.wells.filter(w => {
-    if (tambon !== 'ALL' && w.tambon !== tambon) return false;
-    if (wType === 'SAMPLE_ONLY' && !w.sample_code) return false;
-    if (wType !== 'ALL' && wType !== 'SAMPLE_ONLY' && w.well_type !== wType) return false;
-    if (dist !== 'ALL' && w.distance_band !== dist) return false;
-    if (hc !== 'ALL' && w.health_center !== hc) return false;
-    if (q) {
-      const hay = `${w.well_id} ${w.sample_code} ${w.well_name} ${w.well_type} ${w.house_no} หมู่ ${w.moo} ${w.tambon} ${w.health_center}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
-  tbody.innerHTML = filtered.map((w, idx) => {
-    const linkedCount = state.respondents.filter(r => r.well_id === w.well_id).length;
-    let typeBadge = 'status-safe';
-    if (w.well_type === 'บ่อน้ำตื้น') typeBadge = 'status-warn';
-    if (w.sample_code) typeBadge = 'status-danger';
-    const attCount = Array.isArray(w.attachments) ? w.attachments.length : 0;
-
-    return `
-      <tr>
-        <td>${w.seq || (idx + 1)}</td>
-        <td>${w.sample_code ? `<span class="risk-badge status-danger">${w.sample_code}</span>` : '-'}</td>
-        <td><b>${w.well_id}</b></td>
-        <td>
-          <b>${w.well_name}</b>
-          ${attCount > 0 ? `<div style="margin-top:2px;"><a href="javascript:void(0)" onclick="openWellGalleryModal('${w.well_id}')" style="font-size:11px; color:#0369a1; text-decoration:none;"><i class="fa-solid fa-camera"></i> รูปภาพ/PDF (${attCount})</a></div>` : ''}
-        </td>
-        <td>บ้าน ${w.house_no || '-'} ม.${w.moo} ต.${w.tambon}</td>
-        <td>
-          <span class="risk-badge ${typeBadge}">${w.well_type}</span>
-          ${w.depth_meters ? `<div style="font-size:11px; color:#0369a1; margin-top:2px;">ลึก ~${w.depth_meters} ม.</div>` : ''}
-        </td>
-        <td>
-          <a href="javascript:void(0)" onclick="focusOnMap(${w.latitude}, ${w.longitude})" title="คลิกเพื่อดูจุดบนแผนที่ดาวเทียม">
-            <i class="fa-solid fa-location-dot"></i> ${Number(w.latitude).toFixed(5)}, ${Number(w.longitude).toFixed(5)}
-          </a>
-          <div style="font-size:11px; color:#64748b;">UTM: ${w.utm_e || '-'}, ${w.utm_n || '-'}</div>
-        </td>
-        <td>
-          <b>${w.distance_river_m} ม.</b>
-          <div style="font-size:11px; color:#64748b;">${w.distance_band}</div>
-        </td>
-        <td>${w.usage_type || 'ใช้อุปโภค'}</td>
-        <td>
-          <div>ครัวเรือน: <b>${w.user_count || 1}</b> คน</div>
-          ${linkedCount > 0 ? `<button class="btn btn-sm btn-outline" style="margin-top:3px;" onclick="filterPeopleByWell('${w.well_id}')"><i class="fa-solid fa-link"></i> กลุ่มเสี่ยง ${linkedCount} ราย</button>` : ''}
-        </td>
-        <td>${w.health_center || '-'}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-sm btn-outline" style="color:#0369a1; border-color:#7dd3fc;" onclick="openWellGalleryModal('${w.well_id}')" title="ดูรูปภาพและเอกสารแนบ"><i class="fa-solid fa-camera"></i> ${attCount}</button>
-          <button class="btn btn-sm btn-outline" style="color:#0f766e; border-color:#99f6e4;" onclick="openWaterLabForWell('${w.well_id}')" title="บันทึก/ดูผลตรวจแล็บน้ำของบ่อนี้"><i class="fa-solid fa-flask-vial"></i> ผลแล็บ</button>
-          <button class="btn btn-sm btn-primary" onclick="openWellModal('${w.well_id}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-sm btn-danger" onclick="deleteWell('${w.well_id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
 function filterPeopleByWell(wellId) {
   switchTab('tab-respondents');
   const sel = document.getElementById('resp-filter-well');
@@ -2600,7 +1380,7 @@ function openWellModal(wellId = null) {
     document.getElementById('well-name').value = w.well_name;
     setSelectOrOther('well-type', 'well-type-other-wrap', 'well-type-other', w.well_type || 'บ่อบาดาล');
     if (document.getElementById('well-depth')) document.getElementById('well-depth').value = w.depth_meters || '';
-    setSelectOrOther('well-hc', 'well-hc-other-wrap', 'well-hc-other', w.health_center || 'รพ.สต.บ้านท่าตอน');
+    setSelectOrOther('well-hc', 'well-hc-other-wrap', 'well-hc-other', w.health_center ?? '');
     document.getElementById('well-lat').value = w.latitude;
     document.getElementById('well-lng').value = w.longitude;
     document.getElementById('well-utm-e').value = w.utm_e || '';
@@ -2610,20 +1390,19 @@ function openWellModal(wellId = null) {
     setSelectOrOther('well-tambon', 'well-tambon-other-wrap', 'well-tambon-other', w.tambon || 'ท่าตอน');
     document.getElementById('well-dist').value = w.distance_river_m !== undefined ? w.distance_river_m : 100;
     setSelectOrOther('well-usage-select', 'well-usage-other-wrap', 'well-usage', w.usage_type || 'ใช้อุปโภค');
-    document.getElementById('well-user-count').value = w.user_count || 1;
+    document.getElementById('well-user-count').value = w.user_count ?? '';
     document.getElementById('well-arsenic').value = w.arsenic_level !== undefined ? w.arsenic_level : '';
     setSelectOrOther('well-status-select', 'well-status-other-wrap', 'well-status', w.safety_status || w.arsenic_status || 'เฝ้าระวังตามระยะห่างแม่น้ำกก');
     document.getElementById('well-notes').value = w.notes || '';
     state.currentWellAttachments = Array.isArray(w.attachments) ? [...w.attachments] : [];
   } else {
     title.innerHTML = `<i class="fa-solid fa-faucet-drip"></i> เพิ่มจุดแหล่งน้ำใหม่`;
-    const nextNum = state.wells.length + 1;
-    document.getElementById('well-id').value = `W${String(nextNum).padStart(3, '0')}`;
-    document.getElementById('well-id').readOnly = false;
-    document.getElementById('well-lat').value = 20.0560;
-    document.getElementById('well-lng').value = 99.4000;
-    document.getElementById('well-dist').value = 100;
-    document.getElementById('well-user-count').value = 2;
+    document.getElementById('well-id').value = nextWellId();
+    document.getElementById('well-id').readOnly = true;
+    document.getElementById('well-lat').value = '';
+    document.getElementById('well-lng').value = '';
+    document.getElementById('well-dist').value = '';
+    document.getElementById('well-user-count').value = '';
     state.currentWellAttachments = [];
   }
 
@@ -2647,9 +1426,10 @@ function useCurrentGpsForWell() {
 
 async function handleSaveWell(e) {
   e.preventDefault();
-  const dist = parseFloat(document.getElementById('well-dist').value) || 0;
+  const dist = optionalNumber(document.getElementById('well-dist').value);
   let distBand = 'มากกว่า 300 เมตร';
-  if (dist <= 100) distBand = 'ไม่เกิน 100 เมตร';
+  if (dist === null) distBand = 'ไม่ระบุ';
+  else if (dist <= 100) distBand = 'ไม่เกิน 100 เมตร';
   else if (dist <= 200) distBand = '101 - 200 เมตร';
   else if (dist <= 300) distBand = '201 - 300 เมตร';
 
@@ -2658,11 +1438,12 @@ async function handleSaveWell(e) {
   const existing = state.wells.find(w => w.well_id === wellId);
 
   const wellObj = {
+    ...(existing || {}),
     well_id: wellId,
     seq: existing ? existing.seq : state.wells.length + 1,
     sample_code: pCode,
     well_name: document.getElementById('well-name').value.trim(),
-    owner_name: document.getElementById('well-name').value.trim(),
+    owner_name: existing && existing.well_name === document.getElementById('well-name').value.trim() ? existing.owner_name : document.getElementById('well-name').value.trim(),
     well_type: getSelectOrOther('well-type', 'well-type-other'),
     depth_meters: document.getElementById('well-depth') ? document.getElementById('well-depth').value.trim() : '',
     health_center: getSelectOrOther('well-hc', 'well-hc-other'),
@@ -2678,7 +1459,7 @@ async function handleSaveWell(e) {
     distance_river_m: dist,
     distance_band: distBand,
     usage_type: getSelectOrOther('well-usage-select', 'well-usage'),
-    user_count: Number(document.getElementById('well-user-count').value) || 1,
+    user_count: optionalNumber(document.getElementById('well-user-count').value),
     arsenic_level: document.getElementById('well-arsenic').value,
     safety_status: getSelectOrOther('well-status-select', 'well-status') || (pCode ? `ส่งตรวจสารปนเปื้อน (${pCode})` : 'สำรวจแล้ว'),
     notes: document.getElementById('well-notes').value.trim(),
@@ -2698,143 +1479,6 @@ async function handleSaveWell(e) {
   closeWellModal();
   const lightWell = { ...wellObj, attachments_count: (wellObj.attachments || []).length, attachments: undefined };
   await postToGoogleSheets({ action: 'saveWell', data: lightWell });
-}
-
-async function deleteWell(wellId) {
-  const linked = state.respondents.filter(r => r.well_id === wellId).length;
-  if (!confirm(`ยืนยันการลบจุดบ่อน้ำ ${wellId} หรือไม่? (มีผู้ใช้น้ำเชื่อมโยงอยู่ ${linked} ราย)`)) return;
-  state.wells = state.wells.filter(w => w.well_id !== wellId);
-  saveLocalData();
-  await postToGoogleSheets({ action: 'deleteWell', well_id: wellId });
-}
-
-// ==================== RESPONDENTS TABLE, PIVOT & CRUD ====================
-function renderPivotSummary() {
-  const tbody1 = document.getElementById('pivot-summary-body');
-  const tbody2 = document.getElementById('dash-pivot-body');
-
-  const groups = [
-    { key: 'ประชาชนทั่วไป (แท็บการตอบกลับ)', label: '1. คัดกรองทั่วไป (เฉพาะแท็บการตอบกลับ 153 ราย)' },
-    { key: 'กลุ่มใหม่', label: '2. กลุ่มใหม่ (แท็บเก็บปัสสาวะ NM001-NM080)' },
-    { key: 'ผู้ประกอบอาชีพ', label: '3. ผู้ประกอบอาชีพ (แท็บเก็บปัสสาวะ OCM001-OCM010)' }
-  ];
-  let totalThaton = 0;
-  let totalMaenawang = 0;
-
-  const rowsHtml = groups.map(g => {
-    let thaton = 0;
-    let maenawang = 0;
-    if (g.key === 'ประชาชนทั่วไป (แท็บการตอบกลับ)') {
-      thaton = state.respondents.filter(r => !r.is_urine_target && r.tambon === 'ท่าตอน').length;
-      maenawang = state.respondents.filter(r => !r.is_urine_target && r.tambon === 'แม่นาวาง').length;
-    } else {
-      thaton = state.respondents.filter(r => r.target_group === g.key && r.is_urine_target && r.tambon === 'ท่าตอน').length;
-      maenawang = state.respondents.filter(r => r.target_group === g.key && r.is_urine_target && r.tambon === 'แม่นาวาง').length;
-    }
-    const sum = thaton + maenawang;
-    totalThaton += thaton;
-    totalMaenawang += maenawang;
-    return `
-      <tr>
-        <td>${g.label}</td>
-        <td>${thaton || '-'}</td>
-        <td>${maenawang || '-'}</td>
-        <td><b>${sum}</b></td>
-      </tr>
-    `;
-  }).join('');
-
-  const targetUrineThaton = state.respondents.filter(r => r.is_urine_target && r.tambon === 'ท่าตอน').length;
-  const targetUrineMaenawang = state.respondents.filter(r => r.is_urine_target && r.tambon === 'แม่นาวาง').length;
-
-  const fullHtml = rowsHtml + `
-    <tr style="background:#f0fdf4; font-weight:600; color:#15803d;">
-      <td>รวมเฉพาะกลุ่มเป้าหมายเก็บปัสสาวะ (แท็บที่ 2)</td>
-      <td>${targetUrineThaton}</td>
-      <td>${targetUrineMaenawang}</td>
-      <td><b>${targetUrineThaton + targetUrineMaenawang}</b></td>
-    </tr>
-    <tr style="background:#e2e8f0; font-weight:700;">
-      <td>รวมทั้งหมดในแท็บ "การตอบกลับ" (Grand Total 243 ราย)</td>
-      <td>${totalThaton}</td>
-      <td>${totalMaenawang}</td>
-      <td>${totalThaton + totalMaenawang}</td>
-    </tr>
-  `;
-
-  if (tbody1) tbody1.innerHTML = fullHtml;
-  if (tbody2) tbody2.innerHTML = fullHtml;
-}
-
-function renderRespondentsTable() {
-  const tbody = document.getElementById('respondents-table-body');
-  if (!tbody) return;
-
-  const q = (document.getElementById('resp-search').value || '').toLowerCase().trim();
-  const tabSel = document.getElementById('resp-filter-tab') ? document.getElementById('resp-filter-tab').value : 'ALL';
-  const tambon = document.getElementById('resp-filter-tambon').value;
-  const hc = document.getElementById('resp-filter-hc') ? document.getElementById('resp-filter-hc').value : 'ALL';
-  const group = document.getElementById('resp-filter-group').value;
-  const risk = document.getElementById('resp-filter-risk').value;
-  const wellId = document.getElementById('resp-filter-well').value;
-
-  const filtered = state.respondents.filter(r => {
-    if ((tabSel === 'TARGET_90' || tabSel === 'TARGET_130') && !r.is_urine_target) return false;
-    if (tabSel === 'GENERAL_153' && r.is_urine_target) return false;
-    if (tambon !== 'ALL' && r.tambon !== tambon) return false;
-    if (hc !== 'ALL' && r.health_center !== hc) return false;
-    if (group !== 'ALL' && r.target_group !== group) return false;
-    if (risk !== 'ALL' && r.risk_level !== risk) return false;
-    if (wellId !== 'ALL' && r.well_id !== wellId) return false;
-    if (q) {
-      const hay = `${r.full_name} ${r.cid} ${r.code} ${r.house_no} ${r.tambon} ${r.health_center} ${r.cut_point} ${r.well_id} ${r.source_tab}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
-  tbody.innerHTML = filtered.map((r, idx) => {
-    let badgeClass = 'risk-low';
-    if (r.risk_level === 'ปานกลาง') badgeClass = 'risk-med';
-    if (r.risk_level === 'มาก') badgeClass = 'risk-high';
-
-    const tabBadge = r.is_urine_target
-      ? `<span class="badge" style="background:#dcfce7;color:#15803d;font-size:11px;">เก็บปัสสาวะ (90)</span>`
-      : `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">การตอบกลับ (153)</span>`;
-
-    return `
-      <tr>
-        <td>${r.seq || (idx + 1)}</td>
-        <td><b>${r.code || '-'}</b><div style="margin-top:2px;">${tabBadge}</div></td>
-        <td>${r.survey_date || '2026-05-22'}</td>
-        <td>
-          <a href="javascript:void(0)" onclick="focusOnMap(${r.latitude}, ${r.longitude})" style="font-weight:600; color:#0f172a; text-decoration:none;">
-            ${r.full_name} <i class="fa-solid fa-location-dot" style="color:#0284c7;"></i>
-          </a>
-        </td>
-        <td>${r.age || '-'} ปี / ${r.gender ? r.gender.replace('1) ', '').replace('2) ', '') : '-'}</td>
-        <td>${r.cid || '-'}</td>
-        <td>บ้าน ${r.house_no || '-'} ม.${r.moo} ต.${r.tambon}</td>
-        <td>${r.health_center || '-'}</td>
-        <td class="text-center"><b>${r.exposure_years !== '' && r.exposure_years !== undefined ? r.exposure_years + ' ปี' : '-'}</b></td>
-        <td><span class="badge" style="background:#e0f2fe; color:#0369a1;">${r.well_id || '-'}</span></td>
-        <td>${r.risk_job_type || 'ทั่วไป'} ${r.job_detail ? `<small class="text-muted">(${r.job_detail})</small>` : ''}</td>
-        <td><b>${r.total_score}</b></td>
-        <td><span class="risk-badge ${badgeClass}">${r.risk_level}</span></td>
-        <td>
-          <a href="javascript:void(0)" onclick="open2QModal('${r.id}')" style="text-decoration:none;">
-            ${format2QBadge(r.status_2q)}
-          </a>
-        </td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-sm btn-primary" onclick="openRespondentModal('${r.id}')" title="แก้ไข Env-As-01"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-sm btn-outline" style="color:#7c3aed; border-color:#c4b5fd;" onclick="open2QModal('${r.id}')" title="คัดกรอง 2Q"><i class="fa-solid fa-brain"></i> 2Q</button>
-          <button class="btn btn-sm btn-success" onclick="openEnvAs02ForRespondent('${r.id}')" title="บันทึกต่อใน Env-As-02"><i class="fa-solid fa-vial"></i></button>
-          <button class="btn btn-sm btn-danger" onclick="deleteRespondent('${r.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
-        </td>
-      </tr>
-    `;
-  }).join('');
 }
 
 function recalcScore() {
@@ -2858,17 +1502,17 @@ function recalcScore() {
   if (rMed) rMed.className = '';
   if (rHigh) rHigh.className = '';
 
-  if (score > 20) {
+  if (score >= 20) {
     if (badgeEl) {
       badgeEl.className = 'risk-badge risk-high';
-      badgeEl.textContent = 'สูง / มาก (คะแนน > 20)';
+      badgeEl.textContent = 'สูง / มาก (คะแนน ≥ 20)';
     }
     if (measureEl) measureEl.textContent = 'มาตรการ: ส่งพบแพทย์ตรวจร่างกาย ซักประวัติ Env-As-02 และเก็บปัสสาวะตรวจสารหนู';
     if (rHigh) rHigh.className = 'risk-criteria-row-active';
   } else if (score >= 10) {
     if (badgeEl) {
       badgeEl.className = 'risk-badge risk-med';
-      badgeEl.textContent = 'ปานกลาง (คะแนน 10 - 20)';
+      badgeEl.textContent = 'ปานกลาง (คะแนน 10 - <20)';
     }
     if (measureEl) measureEl.textContent = 'มาตรการ: สื่อสารความเสี่ยง ซักประวัติ Env-As-02 และพิจารณาตรวจสารหนูในปัสสาวะ';
     if (rMed) rMed.className = 'risk-criteria-row-active';
@@ -2883,17 +1527,6 @@ function recalcScore() {
   return score;
 }
 
-function syncCoordinatesFromSelectedWell() {
-  const wellId = document.getElementById('resp-well-id').value;
-  const well = state.wells.find(w => w.well_id === wellId);
-  if (well) {
-    document.getElementById('resp-lat').value = well.latitude;
-    document.getElementById('resp-lng').value = well.longitude;
-    document.getElementById('resp-moo').value = well.moo;
-    setSelectOrOther('resp-tambon', 'resp-tambon-other-wrap', 'resp-tambon-other', well.tambon);
-  }
-}
-
 function useCurrentGpsForRespondent() {
   if (!navigator.geolocation) return alert('เบราว์เซอร์ไม่รองรับ GPS');
   navigator.geolocation.getCurrentPosition(pos => {
@@ -2902,7 +1535,7 @@ function useCurrentGpsForRespondent() {
   });
 }
 
-function openRespondentModal(respId = null) {
+function openDetailedRespondentModal(respId = null) {
   populateWellDropdowns();
   const modal = document.getElementById('respondent-modal');
   const title = document.getElementById('resp-modal-title');
@@ -2916,7 +1549,7 @@ function openRespondentModal(respId = null) {
     title.innerHTML = `<i class="fa-solid fa-user-pen"></i> แก้ไขแบบฟอร์ม Env-As-01: ${r.full_name} (${r.code})`;
     document.getElementById('resp-id').value = r.id;
     document.getElementById('resp-code').value = r.code || '';
-    if (document.getElementById('resp-survey-date')) document.getElementById('resp-survey-date').value = r.survey_date || '2026-05-22';
+    if (document.getElementById('resp-survey-date')) document.getElementById('resp-survey-date').value = r.survey_date || '';
     setSelectOrOther('resp-target-group', 'resp-target-other-wrap', 'resp-target-other', r.target_group || 'กลุ่มใหม่');
     document.getElementById('resp-cut-point').value = r.cut_point || '';
     document.getElementById('resp-well-id').value = r.well_id || '';
@@ -2935,8 +1568,8 @@ function openRespondentModal(respId = null) {
     setSelectOrOther('resp-edu', 'resp-edu-other-wrap', 'resp-edu-other', r.education || '1) ไม่ได้เรียนหนังสือ');
     document.getElementById('resp-years-area').value = r.years_in_area || '';
     if (document.getElementById('resp-exposure-years')) document.getElementById('resp-exposure-years').value = r.exposure_years !== undefined ? r.exposure_years : '';
-    document.getElementById('resp-lat').value = r.latitude || 20.055;
-    document.getElementById('resp-lng').value = r.longitude || 99.400;
+    document.getElementById('resp-lat').value = r.latitude ?? '';
+    document.getElementById('resp-lng').value = r.longitude ?? '';
 
     document.getElementById('resp-job-flag').value = r.risk_job_flag || 'ไม่ใช่';
     document.getElementById('resp-job-type').value = r.risk_job_type || '';
@@ -2954,8 +1587,8 @@ function openRespondentModal(respId = null) {
     document.getElementById('resp-symptoms').value = r.symptoms || '';
     populateCheckboxesFromString('as01-sym-chk', r.symptoms);
 
-    if (document.getElementById('resp-q2-1')) document.getElementById('resp-q2-1').value = r.q2_1 || 'ไม่ใช่';
-    if (document.getElementById('resp-q2-2')) document.getElementById('resp-q2-2').value = r.q2_2 || 'ไม่ใช่';
+    if (document.getElementById('resp-q2-1')) document.getElementById('resp-q2-1').value = r.q2_1 || '';
+    if (document.getElementById('resp-q2-2')) document.getElementById('resp-q2-2').value = r.q2_2 || '';
     if (document.getElementById('resp-status-2q')) document.getElementById('resp-status-2q').value = r.status_2q || 'ยังไม่คัดกรอง';
 
     for (let i = 1; i <= 11; i++) {
@@ -2967,9 +1600,9 @@ function openRespondentModal(respId = null) {
     const nextSeq = state.respondents.length + 1;
     document.getElementById('resp-id').value = `RESP-${String(nextSeq).padStart(3, '0')}`;
     document.getElementById('resp-code').value = `NM${String(nextSeq).padStart(3, '0')}`;
-    if (document.getElementById('resp-survey-date')) document.getElementById('resp-survey-date').value = new Date().toISOString().slice(0, 10);
-    document.getElementById('resp-lat').value = 20.0560;
-    document.getElementById('resp-lng').value = 99.4000;
+    if (document.getElementById('resp-survey-date')) document.getElementById('resp-survey-date').value = bangkokToday();
+    document.getElementById('resp-lat').value = '';
+    document.getElementById('resp-lng').value = '';
     if (document.getElementById('resp-exposure-years')) document.getElementById('resp-exposure-years').value = '';
     recalcScore();
   }
@@ -3005,7 +1638,7 @@ async function handleSaveRespondent(e) {
     code: document.getElementById('resp-code').value.trim(),
     is_urine_target: isTargetUrine,
     urine_seq: existing ? existing.urine_seq : (isTargetUrine ? state.respondents.filter(x => x.is_urine_target).length + 1 : null),
-    source_tab: isTargetUrine ? 'รายชื่อเก็บปัสสาวะ (90 ราย)' : 'การตอบกลับ (คัดกรองทั่วไป 153 ราย)',
+    source_tab: isTargetUrine ? 'รายชื่อเก็บปัสสาวะ (รายชื่อขั้น 2)' : 'การตอบกลับ (คัดกรองขั้นแรก)',
     survey_date: document.getElementById('resp-survey-date') ? document.getElementById('resp-survey-date').value : '2026-10-27',
     interviewer_name: document.getElementById('resp-interviewer') ? document.getElementById('resp-interviewer').value.trim() : 'เจ้าหน้าที่สาธารณสุข',
     health_center: getSelectOrOther('resp-hc', 'resp-hc-other'),
@@ -3074,27 +1707,6 @@ async function handleSaveRespondent(e) {
   await postToGoogleSheets({ action: 'saveRespondent', data: respObj });
 }
 
-async function deleteRespondent(respId) {
-  const r = state.respondents.find(item => item.id === respId);
-  if (!r) return;
-  if (!confirm(`ยืนยันการลบรายชื่อ "${r.full_name}" (${r.code}) ออกจากระบบหรือไม่?`)) return;
-
-  state.respondents = state.respondents.filter(item => item.id !== respId);
-  saveLocalData();
-  await postToGoogleSheets({ action: 'deleteRespondent', id: respId });
-}
-
-async function deleteRespondent(respId) {
-  const r = state.respondents.find(item => item.id === respId);
-  if (!r) return;
-  if (!confirm(`ยืนยันการลบรายชื่อ "${r.full_name}" (${r.code}) ออกจากระบบหรือไม่?`)) return;
-
-  state.respondents = state.respondents.filter(item => item.id !== respId);
-  saveLocalData();
-  await postToGoogleSheets({ action: 'deleteRespondent', id: respId });
-}
-
-// ==================== BULK CSV IMPORT & SAMPLE TEMPLATES ====================
 function parseCsvLine(line) {
   const result = [];
   let cur = '';
@@ -3114,246 +1726,24 @@ function parseCsvLine(line) {
   return result;
 }
 
-function downloadTemplateCsv(type) {
-  if (type === 'wells') {
-    const headers = ['well_id', 'sample_code', 'well_name', 'house_no', 'moo', 'tambon', 'well_type', 'depth_meters', 'utm_e', 'utm_n', 'latitude', 'longitude', 'distance_river_m', 'usage_type', 'user_count', 'health_center'];
-    const sample1 = ['W148', 'P44', 'ศาลาหมู่บ้านตัวอย่าง', '10', '3', 'ท่าตอน', 'บ่อน้ำตื้น', '12', '538100', '2218000', '', '', '80', 'ใช้อุปโภค', '4', 'รพ.สต.บ้านท่าตอน'];
-    const sample2 = ['W149', '', 'นายสมชาย ใจดี', '25', '14', 'แม่นาวาง', 'บ่อบาดาล', '45', '542500', '2216600', '', '', '220', 'ใช้อุปโภค', '2', 'รพ.สต.บ้านแม่เมืองน้อย'];
-    downloadCsvFile('template_import_wells.csv', [headers.join(','), sample1.join(','), sample2.join(',')].join('\n'));
-  } else if (type === 'waterlab') {
-    const headers = ['well_id', 'sample_code', 'sample_date', 'lab_name', 'standard_type', 'ph', 'colour', 'turbidity', 'tds', 'hardness', 'fe', 'mn', 'cu', 'zn', 'pb', 'cr', 'cd', 'as_val', 'hg', 'so4', 'cl', 'no3', 'f', 'residual_cl', 'total_coliform', 'faecal_coliform', 'notes'];
-    const sample1 = ['W001-P1', 'P1', '2026-05-22', 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่', 'DOH_2543', '7.2', '5', '3.5', '280', '140', '0.18', '0.08', '0.05', '0.2', '0.002', '0.005', '0.0005', '0.004', '0.1', '45', '30', '8', '0.3', '', '0', '0', 'ตัวอย่างผลตรวจผ่านเกณฑ์ทุกพารามิเตอร์'];
-    downloadCsvFile('template_import_water_lab_doh.csv', [headers.join(','), sample1.join(',')].join('\n'));
-  } else if (type === 'as01') {
-    const headers = ['code', 'full_name', 'age', 'gender', 'cid', 'house_no', 'moo', 'tambon', 'marital_status', 'education', 'years_in_area', 'risk_job_flag', 'risk_job_type', 'job_detail', 'job_duration', 'job_hours', 'disease_flag', 'diseases', 'symptom_flag', 'symptoms', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10', 'q11', 'target_group', 'well_id', 'survey_date', 'interviewer_name'];
-    const sample1 = ['NM131', 'นายตัวอย่าง ทดสอบนำเข้า', '45', '1) ชาย', '1501000012345', '99', '5', 'ท่าตอน', '2) คู่', '2) ประถมศึกษา', '30', 'ใช่', '3) เกษตรกร', 'ทำสวนใกล้แม่น้ำกก', '10ปี', '6', 'ไม่มี', '', 'ไม่มี', '', '0', '1', '0', '0', '1', '1', '1', '0', '0', '0', '1', 'กลุ่มใหม่', 'W001-P1', '2026-05-22', 'เจ้าหน้าที่ รพ.สต.'];
-    downloadCsvFile('template_import_env_as01.csv', [headers.join(','), sample1.join(',')].join('\n'));
-  } else if (type === 'as02') {
-    const headers = ['form_no', 'full_name', 'age', 'phone', 'gender', 'weight_kg', 'height_cm', 'cid', 'house_no', 'moo', 'tambon', 'within_1km_river', 'risk_job_type', 'diseases', 'herb_usage', 'smoking_status', 'alcohol_status', 'seafood_freq', 'seafood_3days', 'drink_sources', 'use_sources', 'food_rice', 'food_veg', 'eat_river_veg_weekly', 'flood_5years', 'interviewer_name', 'health_center', 'interview_date'];
-    const sample1 = ['69-0050', 'นายตัวอย่าง ทดสอบนำเข้า', '45', '0812345678', '1) ชาย', '60', '165', '1501000012345', '99', '5', 'ท่าตอน', '1.ใช่', '3) เกษตรกร', 'ไม่มี', '5. ไม่ได้กิน', '1. ไม่สูบ', '1. ไม่ดื่ม', '4. เดือนละ 1-2 ครั้ง', 'ไม่ใช่', '1. บ่อน้ำตื้น (10 ปี)', '3. บ่อบาดาล (10 ปี)', '1. ปลูกเอง', '1. ปลูกเอง/หาเอง', '1.ใช่', '2.ไม่เคย', 'เจ้าหน้าที่สาธารณสุข', 'รพ.สต.บ้านท่าตอน', '2026-05-22'];
-    downloadCsvFile('template_import_env_as02.csv', [headers.join(','), sample1.join(',')].join('\n'));
-  }
-}
-
-function handleBulkImport(type) {
-  const fileInputMap = {
-    wells: 'import-file-wells',
-    waterlab: 'import-file-waterlab',
-    as01: 'import-file-as01',
-    as02: 'import-file-as02'
-  };
-  const fileInput = document.getElementById(fileInputMap[type]);
-  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-    alert('กรุณาเลือกไฟล์ .CSV ที่ต้องการนำเข้าก่อนครับ');
-    return;
-  }
-
-  const file = fileInput.files[0];
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const text = e.target.result;
-    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-    if (lines.length < 2) {
-      alert('ไฟล์ CSV ไม่มีข้อมูลแถวสำหรับนำเข้า');
-      return;
-    }
-
-    let importedCount = 0;
-    for (let i = 1; i < lines.length; i++) {
-      const cols = parseCsvLine(lines[i]);
-      if (cols.length < 3) continue;
-
-      if (type === 'wells') {
-        const hasDepthCol = cols.length >= 16;
-        const depthVal = hasDepthCol ? cols[7] : '';
-        const offset = hasDepthCol ? 1 : 0;
-        const utmE = parseFloat(cols[7 + offset]) || 538000;
-        const utmN = parseFloat(cols[8 + offset]) || 2218000;
-        let lat = parseFloat(cols[9 + offset]);
-        let lng = parseFloat(cols[10 + offset]);
-        if (isNaN(lat) || isNaN(lng)) {
-          const conv = utm47NToLatLng(utmE, utmN);
-          lat = conv.lat;
-          lng = conv.lng;
-        }
-        const newWell = normalizeWellRecord({
-          well_id: cols[0] || `W${String(state.wells.length + 1).padStart(3, '0')}`,
-          seq: state.wells.length + 1,
-          sample_code: cols[1] || '',
-          well_name: cols[2] || 'จุดบ่อน้ำนำเข้า',
-          owner_name: cols[2] || '',
-          house_no: cols[3] || '',
-          moo: Number(cols[4]) || 1,
-          tambon: cols[5] || 'ท่าตอน',
-          well_type: cols[6] || 'บ่อบาดาล',
-          depth_meters: depthVal !== '' ? parseFloat(depthVal) : '',
-          utm_e: utmE,
-          utm_n: utmN,
-          latitude: lat,
-          longitude: lng,
-          distance_river_m: parseFloat(cols[11 + offset]) || 100,
-          usage_type: cols[12 + offset] || 'ใช้อุปโภค',
-          user_count: Number(cols[13 + offset]) || 1,
-          health_center: cols[14 + offset] || 'รพ.สต.บ้านท่าตอน',
-          safety_status: cols[1] ? `ส่งตรวจสารปนเปื้อน (${cols[1]})` : 'สำรวจแล้ว'
-        }, state.wells.length);
-        state.wells.push(newWell);
-        importedCount++;
-      } else if (type === 'waterlab') {
-        const labRec = {
-          id: `WLAB-${String(state.waterLabs.length + 1).padStart(3, '0')}`,
-          well_id: cols[0] || 'W001-P1',
-          sample_code: cols[1] || `LAB-${state.waterLabs.length + 1}`,
-          sample_date: cols[2] || new Date().toISOString().slice(0, 10),
-          lab_name: cols[3] || 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่',
-          standard_type: cols[4] || 'DOH_2543',
-          ph: cols[5] || '', colour: cols[6] || '', turbidity: cols[7] || '', tds: cols[8] || '',
-          hardness: cols[9] || '', fe: cols[10] || '', mn: cols[11] || '', cu: cols[12] || '',
-          zn: cols[13] || '', pb: cols[14] || '', cr: cols[15] || '', cd: cols[16] || '',
-          as_val: cols[17] || '', hg: cols[18] || '', so4: cols[19] || '', cl: cols[20] || '',
-          no3: cols[21] || '', f: cols[22] || '', residual_cl: cols[23] || '',
-          total_coliform: cols[24] || '', faecal_coliform: cols[25] || '',
-          notes: cols[26] || ''
-        };
-        const evalRes = evaluateWaterLabRecord(labRec);
-        labRec.overall_status = evalRes.overallStatus;
-        labRec.failed_params = evalRes.failedNames.join(', ');
-        state.waterLabs.push(labRec);
-        importedCount++;
-      } else if (type === 'as01') {
-        const qVals = [];
-        for (let qIdx = 20; qIdx <= 30; qIdx++) {
-          qVals.push(Number(cols[qIdx]) ? 1 : 0);
-        }
-        const score = qVals[0]*5 + qVals[1]*5 + qVals[2]*5 + qVals[3]*1.5 + qVals[4]*1.5 + qVals[5]*1 + qVals[6]*1 + qVals[7]*4 + qVals[8]*4 + qVals[9]*1 + qVals[10]*1.5;
-        const wellId = cols[32] || (state.wells[0] ? state.wells[0].well_id : 'W001-P1');
-        const wRef = state.wells.find(w => w.well_id === wellId) || state.wells[0];
-
-        const newResp = normalizeRespondentRecord({
-          id: `RESP-${String(state.respondents.length + 1).padStart(3, '0')}`,
-          seq: state.respondents.length + 1,
-          code: cols[0] || `NM${String(state.respondents.length + 1).padStart(3, '0')}`,
-          full_name: cols[1] || '',
-          age: cols[2] || '',
-          gender: cols[3] || '1) ชาย',
-          cid: cols[4] || '',
-          house_no: cols[5] || '',
-          moo: cols[6] || 1,
-          tambon: cols[7] || 'ท่าตอน',
-          marital_status: cols[8] || '2) คู่',
-          education: cols[9] || '2) ประถมศึกษา',
-          years_in_area: cols[10] || '',
-          risk_job_flag: cols[11] || 'ไม่ใช่',
-          risk_job_type: cols[12] || '',
-          job_detail: cols[13] || '',
-          job_duration: cols[14] || '',
-          job_hours: cols[15] || '',
-          disease_flag: cols[16] || 'ไม่มี',
-          diseases: cols[17] || '',
-          symptom_flag: cols[18] || 'ไม่มี',
-          symptoms: cols[19] || '',
-          q1: qVals[0], q2: qVals[1], q3: qVals[2], q4: qVals[3], q5: qVals[4],
-          q6: qVals[5], q7: qVals[6], q8: qVals[7], q9: qVals[8], q10: qVals[9], q11: qVals[10],
-          total_score: score,
-          target_group: cols[31] || 'กลุ่มใหม่',
-          well_id: wellId,
-          survey_date: cols[33] || new Date().toISOString().slice(0, 10),
-          interviewer_name: cols[34] || 'เจ้าหน้าที่สาธารณสุข',
-          latitude: wRef ? wRef.latitude + 0.0002 : 20.056,
-          longitude: wRef ? wRef.longitude + 0.0002 : 99.400
-        }, state.respondents.length);
-        state.respondents.push(newResp);
-        importedCount++;
-      } else if (type === 'as02') {
-        state.envAs02.push({
-          id: `AS02-${String(state.envAs02.length + 1).padStart(3, '0')}`,
-          form_no: cols[0] || `69-${String(state.envAs02.length + 1).padStart(4, '0')}`,
-          full_name: cols[1] || '',
-          age: cols[2] || '',
-          phone: cols[3] || '',
-          gender: cols[4] || '1) ชาย',
-          weight_kg: cols[5] || '',
-          height_cm: cols[6] || '',
-          cid: cols[7] || '',
-          house_no: cols[8] || '',
-          moo: cols[9] || '',
-          tambon: cols[10] || 'ท่าตอน',
-          within_1km_river: cols[11] || '1.ใช่',
-          risk_job_type: cols[12] || '',
-          diseases: cols[13] || '',
-          herb_usage: cols[14] || '5. ไม่ได้กิน',
-          smoking_status: cols[15] || '1. ไม่สูบ',
-          alcohol_status: cols[16] || '1. ไม่ดื่ม',
-          seafood_freq: cols[17] || '5. ไม่ได้กินเลย',
-          seafood_3days: cols[18] || 'ไม่ใช่',
-          drink_sources: cols[19] || '',
-          use_sources: cols[20] || '',
-          food_rice: cols[21] || '1. ปลูกเอง',
-          food_veg: cols[22] || '1. ปลูกเอง/หาเอง',
-          eat_river_veg_weekly: cols[23] || '2.ไม่ใช่',
-          flood_5years: cols[24] || '2.ไม่เคย',
-          interviewer_name: cols[25] || 'เจ้าหน้าที่สาธารณสุข',
-          health_center: cols[26] || 'รพ.สต.บ้านท่าตอน',
-          interview_date: cols[27] || new Date().toISOString().slice(0, 10)
-        });
-        importedCount++;
-      }
-    }
-
-    saveLocalData();
-    alert(`นำเข้าข้อมูลสำเร็จจำนวน ${importedCount} รายการ! แดชบอร์ดและแผนที่อัปเดตเรียบร้อยแล้ว`);
-  };
-  reader.readAsText(file, 'utf-8');
-}
-
 // ==================== GOOGLE SHEETS CLOUD SYNC & ADMIN LOCK ====================
-function autoSaveGasUrlInput(val) {
-  const url = (val || '').trim();
-  if (url && url.startsWith('https://script.google.com/')) {
-    persistGasUrlEverywhere(url);
-    updateSyncBadge(true);
-    logCloudMessage(`บันทึกลิงก์อัตโนมัติเรียบร้อยแล้ว: ${url}`);
-  }
+function autoSaveGasUrlInput() {
+ // Endpoint changes are applied only by the explicit save action after signing out.
 }
 
 function toggleUnlockGasInput() {
-  const input = document.getElementById('gas-url-input');
-  const unlockBtn = document.getElementById('btn-unlock-gas');
-  if (!input) return;
-
-  if (!state.gasUnlocked) {
-    if (state.currentUser && state.currentUser.role !== 'admin') {
-      const pin = prompt('กรุณากรอกรหัสผ่านผู้ดูแลระบบ (Admin Password) เพื่อปลดล็อกแก้ไขลิงก์ Google Sheets:');
-      if (pin !== '1234') {
-        alert('รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง');
-        return;
-      }
-    }
-    state.gasUnlocked = true;
-    input.readOnly = false;
-    input.style.background = '#ffffff';
-    input.style.cursor = 'text';
-    input.focus();
-    if (unlockBtn) unlockBtn.innerHTML = `<i class="fa-solid fa-lock"></i> ล็อกช่องลิงก์`;
-  } else {
-    state.gasUnlocked = false;
-    input.readOnly = true;
-    input.style.background = '#e2e8f0';
-    input.style.cursor = 'not-allowed';
-    if (unlockBtn) unlockBtn.innerHTML = `<i class="fa-solid fa-key"></i> ปลดล็อกแก้ไขลิงก์ (เฉพาะ Admin)`;
-  }
+ if(state.currentUser?.role!=='admin'){alert('ผู้ดูแลระบบเท่านั้นที่แก้ลิงก์ได้');return;}
+ const input=document.getElementById('gas-url-input');if(!input)return;
+ state.gasUnlocked=!state.gasUnlocked;input.readOnly=!state.gasUnlocked;
 }
 
-function saveGasUrl() {
-  const input = document.getElementById('gas-url-input');
-  const url = input ? input.value.trim() : '';
-  persistGasUrlEverywhere(url);
-  updateSyncBadge(Boolean(url));
-  logCloudMessage(`บันทึกและจำลิงก์ถาวรเรียบร้อยแล้ว: ${url || '(โหมดออฟไลน์)'}`);
-  if (url && state.gasUnlocked) {
-    toggleUnlockGasInput();
-  }
-  alert('บันทึกลิงก์ Google Sheets ไว้ในระบบถาวรเรียบร้อยแล้ว! เมื่อปิดและเปิดโปรแกรมใหม่ ระบบจะจำลิงก์นี้ให้อัตโนมัติครับ');
+async function saveGasUrl() {
+ if(state.currentUser?.role!=='admin'){alert('ผู้ดูแลระบบเท่านั้นที่แก้ลิงก์ได้');return;}
+ const url=document.getElementById('gas-url-input').value.trim();
+ if(!validGasUrl(url)){alert('ใช้ลิงก์ Google Apps Script ที่ลงท้าย /exec เท่านั้น');return;}
+ if(pendingCloudWrites().length){alert('กรุณาส่งรายการรอส่งให้สำเร็จก่อนเปลี่ยนลิงก์');return;}
+ handleLogout();persistGasUrlEverywhere(url);state.cloudCapabilities=null;await probeCloudConnection();
+ setLoginMessage('บันทึกลิงก์แล้ว กรุณาเข้าสู่ระบบส่วนกลางอีกครั้ง');
 }
 
 async function saveGasUrlToAppJsFile() {
@@ -3391,16 +1781,12 @@ async function saveGasUrlToAppJsFile() {
   }
 }
 
-function updateSyncBadge(connected) {
-  const badge = document.getElementById('sync-status-badge');
-  if (!badge) return;
-  if (connected) {
-    badge.className = 'badge badge-cloud';
-    badge.innerHTML = `<i class="fa-solid fa-cloud-check"></i> เชื่อมต่อ Google Sheets แล้ว`;
-  } else {
-    badge.className = 'badge badge-local';
-    badge.innerHTML = `<i class="fa-solid fa-database"></i> โหมดพร้อมใช้งาน (Local + Cloud)`;
-  }
+function updateSyncBadge() {
+ const badge=document.getElementById('sync-status-badge');if(!badge)return;
+ const count=pendingCloudWrites().length;
+ badge.className='badge '+(state.cloudVerified&&!count?'badge-cloud':'badge-local');
+ badge.textContent=count?'รอส่ง Google Sheets '+count+' รายการ':state.cloudVerified?'เชื่อมต่อ Google Sheets แล้ว':'ยังไม่ยืนยันข้อมูลจาก Google Sheets';
+ updatePendingNotice();
 }
 
 function logCloudMessage(msg) {
@@ -3408,197 +1794,6 @@ function logCloudMessage(msg) {
   if (logEl) {
     logEl.textContent = `[${new Date().toLocaleTimeString('th-TH')}] ${msg}`;
   }
-}
-
-async function postToGoogleSheets(payload) {
-  const inputEl = document.getElementById('gas-url-input');
-  if (!state.gasUrl && inputEl && inputEl.value.trim()) {
-    persistGasUrlEverywhere(inputEl.value.trim());
-    updateSyncBadge(true);
-  }
-  if (!state.gasUrl) return;
-  try {
-    logCloudMessage(`กำลังส่งข้อมูล (${payload.action}) ไปยัง Google Sheets...`);
-    await fetch(state.gasUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-    logCloudMessage(`ซิงค์ข้อมูล (${payload.action}) ลง Google Sheets สำเร็จ!`);
-  } catch (err) {
-    logCloudMessage(`เกิดข้อผิดพลาดในการซิงค์: ${err.message}`);
-  }
-}
-
-async function syncAllToGoogleSheets() {
-  const inputEl = document.getElementById('gas-url-input');
-  if (inputEl && inputEl.value.trim()) {
-    persistGasUrlEverywhere(inputEl.value.trim());
-    updateSyncBadge(true);
-  }
-  if (!state.gasUrl) {
-    alert('กรุณาวางลิงก์ Google Apps Script Web App URL ในช่องลิงก์ก่อนครับ');
-    return;
-  }
-  // บันทึกและล็อกลิงก์อัตโนมัติทันทีที่กดปุ่มสีเขียว
-  persistGasUrlEverywhere(state.gasUrl);
-  if (state.gasUnlocked) {
-    toggleUnlockGasInput();
-  }
-  const lightWells = state.wells.map(w => ({
-    ...w,
-    attachments_count: (w.attachments || []).length,
-    attachments: undefined
-  }));
-  const lightDocs = (state.knowledgeDocs || []).map(d => ({
-    id: d.id,
-    title: d.title,
-    category: d.category,
-    author: d.author,
-    date: d.date,
-    description: d.description,
-    file_url: d.file_url && d.file_url.startsWith('data:') ? '[ไฟล์แนบในระบบ]' : d.file_url
-  }));
-  await postToGoogleSheets({
-    action: 'syncAll',
-    wells: lightWells,
-    waterLabs: state.waterLabs,
-    respondents: state.respondents,
-    envAs02: state.envAs02,
-    knowledgeDocs: lightDocs
-  });
-  alert(`ส่งข้อมูลทั้งหมด (แหล่งน้ำ ${state.wells.length} บ่อ + ผลแล็บน้ำ ${state.waterLabs.length} รายการ + คัดกรอง Env-As-01 ${state.respondents.length} ราย + ซักประวัติ Env-As-02 ${state.envAs02.length} ราย + คู่มือ ${lightDocs.length} รายการ) ขึ้น Google Sheets และบันทึกลิงก์เชื่อมต่อถาวรเรียบร้อยแล้ว!`);
-}
-
-async function pullFromGoogleSheets(silent = false) {
-  const inputEl = document.getElementById('gas-url-input');
-  if (!state.gasUrl && inputEl && inputEl.value.trim()) {
-    persistGasUrlEverywhere(inputEl.value.trim());
-    updateSyncBadge(true);
-  }
-  if (!state.gasUrl) {
-    if (!silent) alert('กรุณาตั้งค่า Google Apps Script Web App URL ก่อนครับ');
-    return;
-  }
-  try {
-    logCloudMessage('กำลังดึงข้อมูลล่าสุดจาก Google Sheets...');
-    const res = await fetch(`${state.gasUrl}?action=getAll`);
-    const data = await res.json();
-    if (data.status === 'success') {
-      if (Array.isArray(data.wells) && data.wells.length > 0) state.wells = data.wells.map(normalizeWellRecord);
-      if (Array.isArray(data.waterLabs) && data.waterLabs.length > 0) state.waterLabs = data.waterLabs;
-      if (Array.isArray(data.respondents) && data.respondents.length > 0) state.respondents = data.respondents.map(normalizeRespondentRecord);
-      if (Array.isArray(data.envAs02) && data.envAs02.length > 0) state.envAs02 = data.envAs02;
-      saveLocalData();
-      logCloudMessage(`ดึงข้อมูลสำเร็จ! (บ่อน้ำ ${state.wells.length} จุด, ผลแล็บ ${state.waterLabs.length} รายการ, Env-As-01 ${state.respondents.length} ราย, Env-As-02 ${state.envAs02.length} ราย)`);
-    }
-  } catch (err) {
-    if (!silent) {
-      logCloudMessage(`ดึงข้อมูลไม่สำเร็จ (ตรวจสอบสิทธิ์การ Deploy เป็น Anyone): ${err.message}`);
-    }
-  }
-}
-
-// ==================== EXPORT CSV / BACKUP / RESET ====================
-function exportRespondentsCsv() {
-  const headers = [
-    'ลำดับ', 'รหัสแบบคัดกรอง(code)', 'แหล่งข้อมูล(source_tab)', 'วันที่ลงสำรวจ', 'ผู้สัมภาษณ์',
-    'ชื่อ - นามสกุล', 'อายุ (ปี)', 'เพศ', 'เลขประจำตัวประชาชน',
-    'บ้านเลขที่', 'หมู่ที่', 'ตำบล', 'รพ.สต.', 'อำเภอ', 'จังหวัด',
-    'รหัสจุดบ่อน้ำ', 'พิกัดละติจูด', 'พิกัดลองจิจูด',
-    'ระยะเวลาที่สัมผัส(ปี)', 'อาชีพที่เสี่ยง', 'ลักษณะงาน', 'โรคประจำตัว', 'อาการแสดง',
-    'ข้อ1', 'ข้อ2', 'ข้อ3', 'ข้อ4', 'ข้อ5', 'ข้อ6', 'ข้อ7', 'ข้อ8', 'ข้อ9', 'ข้อ10', 'ข้อ11',
-    'รวมคะแนน', 'ความเสี่ยง', 'ผลคัดกรอง2Q', 'cut point', 'กลุ่มเป้าหมาย'
-  ];
-
-  const rows = state.respondents.map((r, idx) => [
-    r.seq || (idx + 1),
-    `"${r.code || ''}"`,
-    `"${r.source_tab || 'การตอบกลับ'}"`,
-    `"${r.survey_date || ''}"`,
-    `"${r.interviewer_name || ''}"`,
-    `"${r.full_name || ''}"`,
-    r.age || '',
-    `"${r.gender || ''}"`,
-    `"${r.cid || ''}"`,
-    `"${r.house_no || ''}"`,
-    r.moo || '',
-    `"${r.tambon || ''}"`,
-    `"${r.health_center || ''}"`,
-    `"${r.amphoe || 'แม่อาย'}"`,
-    `"${r.province || 'เชียงใหม่'}"`,
-    `"${r.well_id || ''}"`,
-    r.latitude || '',
-    r.longitude || '',
-    r.exposure_years !== undefined ? r.exposure_years : '',
-    `"${r.risk_job_type || ''}"`,
-    `"${r.job_detail || ''}"`,
-    `"${r.diseases || ''}"`,
-    `"${r.symptoms || ''}"`,
-    r.q1||0, r.q2||0, r.q3||0, r.q4||0, r.q5||0, r.q6||0, r.q7||0, r.q8||0, r.q9||0, r.q10||0, r.q11||0,
-    r.total_score,
-    `"${r.risk_level || ''}"`,
-    `"${r.status_2q || 'ยังไม่คัดกรอง'}"`,
-    `"${r.cut_point || ''}"`,
-    `"${r.target_group || ''}"`
-  ]);
-
-  downloadCsvFile('Env_As_01_screening_243_maeai.csv', [headers.join(','), ...rows.map(r => r.join(','))].join('\n'));
-}
-
-function exportEnvAs02Csv() {
-  const headers = [
-    'เลขที่แบบฟอร์ม', 'ชื่อ-นามสกุล', 'อายุ', 'เบอร์โทร', 'เพศ', 'น้ำหนัก(กก.)', 'ส่วนสูง(ซม.)', 'เลข13หลัก',
-    'บ้านเลขที่', 'หมู่ที่', 'ตำบล', 'รพ.สต.', 'ระยะเวลาที่สัมผัส(ปี)', 'รัศมี1กม.แม่น้ำปนเปื้อน', 'อาชีพเสี่ยง', 'โรคประจำตัว',
-    'การใช้ยาสมุนไพร', 'การสูบบุหรี่', 'การดื่มสุรา', 'ความถี่อาหารทะเล(1เดือน)', 'กินอาหารทะเลใน3วันก่อนตรวจ',
-    'แหล่งน้ำดื่มประจำ', 'แหล่งน้ำใช้ในครัวเรือน', 'ข้าวที่บริโภค', 'พืชผักที่บริโภค',
-    'กินผักริมน้ำปนเปื้อนประจำ', 'น้ำหลากเข้าบ้านใน5ปี', 'ผลคัดกรอง2Q', 'ผู้สัมภาษณ์', 'วันที่สัมภาษณ์'
-  ];
-  const rows = state.envAs02.map(item => [
-    `"${item.form_no || ''}"`, `"${item.full_name || ''}"`, item.age || '', `"${item.phone || ''}"`,
-    `"${item.gender || ''}"`, item.weight_kg || '', item.height_cm || '', `"${item.cid || ''}"`,
-    `"${item.house_no || ''}"`, item.moo || '', `"${item.tambon || ''}"`, `"${item.health_center || ''}"`,
-    item.exposure_years !== undefined ? item.exposure_years : '',
-    `"${item.within_1km_river || ''}"`,
-    `"${item.risk_job_type || ''}"`, `"${item.diseases || ''}"`, `"${item.herb_usage || ''}"`,
-    `"${item.smoking_status || ''}"`, `"${item.alcohol_status || ''}"`, `"${item.seafood_freq || ''}"`,
-    `"${item.seafood_3days || ''}"`, `"${item.drink_sources || ''}"`, `"${item.use_sources || ''}"`,
-    `"${item.food_rice || ''}"`, `"${item.food_veg || ''}"`, `"${item.eat_river_veg_weekly || ''}"`,
-    `"${item.flood_5years || ''}"`, `"${item.status_2q || 'ยังไม่คัดกรอง'}"`,
-    `"${item.interviewer_name || ''}"`,
-    `"${item.interview_date || ''}"`
-  ]);
-  downloadCsvFile('Env_As_02_pre_lab_survey_90_maeai.csv', [headers.join(','), ...rows.map(r => r.join(','))].join('\n'));
-}
-
-function exportWellsCsv() {
-  const headers = [
-    'ลำดับ', 'รหัสส่งตรวจ', 'รหัสระบบ', 'ชื่อ-สกุล/แหล่งน้ำ', 'บ้านเลขที่', 'หมู่ที่', 'ตำบล',
-    'ลักษณะบ่อ', 'ความลึกโดยประมาณ(เมตร)', 'พิกัด_UTM_N(X)', 'พิกัด_UTM_E(Y)', 'ละติจูด(Lat)', 'ลองจิจูด(Lng)',
-    'ระยะห่างแม่น้ำกก(เมตร)', 'ช่วงระยะห่าง', 'ลักษณะการใช้งาน', 'จำนวนผู้ใช้น้ำ', 'รพ.สต.'
-  ];
-  const rows = state.wells.map((w, idx) => [
-    w.seq || (idx + 1),
-    `"${w.sample_code || ''}"`,
-    `"${w.well_id}"`,
-    `"${w.well_name}"`,
-    `"${w.house_no || ''}"`,
-    w.moo,
-    `"${w.tambon}"`,
-    `"${w.well_type}"`,
-    w.depth_meters !== undefined && w.depth_meters !== '' ? w.depth_meters : '',
-    w.utm_e || '',
-    w.utm_n || '',
-    w.latitude,
-    w.longitude,
-    w.distance_river_m || 0,
-    `"${w.distance_band || ''}"`,
-    `"${w.usage_type || ''}"`,
-    w.user_count || 1,
-    `"${w.health_center || ''}"`
-  ]);
-  downloadCsvFile('water_wells_147_maeai.csv', [headers.join(','), ...rows.map(r => r.join(','))].join('\n'));
 }
 
 function downloadCsvFile(filename, content) {
@@ -3610,49 +1805,6 @@ function downloadCsvFile(filename, content) {
   link.click();
 }
 
-function downloadFullBackupJson() {
-  const dataStr = JSON.stringify({
-    wells: state.wells,
-    waterLabs: state.waterLabs,
-    respondents: state.respondents,
-    envAs02: state.envAs02,
-    knowledgeDocs: state.knowledgeDocs
-  }, null, 2);
-  const blob = new Blob([dataStr], { type: 'application/json' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'arsenic_gis_full_backup.json';
-  link.click();
-}
-
-function resetToSeedData() {
-  if (!confirm('ต้องการล้างแคชและรีเซ็ตข้อมูลกลับเป็นค่าเริ่มต้น (โดยยังคงจำลิงก์ Google Sheets ไว้เหมือนเดิม) หรือไม่?')) return;
-  const savedUrl = state.gasUrl || localStorage.getItem(STORAGE_KEY_GAS_URL) || localStorage.getItem(STORAGE_KEY_GAS_URL_BACKUP) || '';
-  localStorage.clear();
-  if (savedUrl) {
-    persistGasUrlEverywhere(savedUrl);
-  }
-  state.wells = INITIAL_WELLS.map(normalizeWellRecord);
-  state.respondents = INITIAL_RESPONDENTS.map(normalizeRespondentRecord);
-  state.envAs02 = typeof INITIAL_ENV_AS02 !== 'undefined' ? [...INITIAL_ENV_AS02] : [];
-  state.waterLabs = [...INITIAL_WATER_LABS];
-  state.knowledgeDocs = [...INITIAL_KNOWLEDGE_DOCS];
-  saveLocalData();
-  alert('ล้างแคชและรีเซ็ตข้อมูลเริ่มต้นใหม่เรียบร้อยแล้ว (ยังคงจำลิงก์เชื่อมต่อ Google Sheets เดิมไว้)');
-}
-
-async function copyAppsScriptCode() {
-  try {
-    const res = await fetch('google-apps-script.gs');
-    const code = await res.text();
-    await navigator.clipboard.writeText(code);
-    alert('คัดลอกโค้ด Google Apps Script ลงในคลิปบอร์ดเรียบร้อยแล้ว! นำไปวางในเมนู Extensions > Apps Script ของ Google Sheets ได้เลยครับ');
-  } catch (err) {
-    alert('คุณสามารถเปิดไฟล์ google-apps-script.gs ในโฟลเดอร์โปรเจกต์เพื่อคัดลอกโค้ดได้โดยตรงครับ');
-  }
-}
-
-// ==================== WATER QUALITY LAB PARAMETERS (DOH 21 PARAMETERS) ====================
 const WATER_LAB_PARAMS = [
   { key: 'ph', seq: 1, name: 'ความเป็นกรด-ด่าง (pH)', unit: '-', whoLabel: '6.5-8.5', ruralLabel: '6.5-8.5', dohLabel: '6.5-8.5', type: 'range', WHO_1984: [6.5, 8.5], RURAL: [6.5, 8.5], DOH_2543: [6.5, 8.5], secId: 'wlab-sec-phys' },
   { key: 'colour', seq: 2, name: 'สี (Colour)', unit: 'แพลตตินัมโคบอลต์', whoLabel: '15', ruralLabel: '15', dohLabel: '15', type: 'max', WHO_1984: 15, RURAL: 15, DOH_2543: 15 },
@@ -3677,13 +1829,7 @@ const WATER_LAB_PARAMS = [
   { key: 'faecal_coliform', seq: 21, name: 'ฟีคัลโคลิฟอร์มแบคทีเรีย (Faecal Coliform Bacteria)', unit: 'เอ็มพีเอ็น/100 มล.', whoLabel: '0', ruralLabel: '0', dohLabel: '0', type: 'max', WHO_1984: 0, RURAL: 0, DOH_2543: 0 }
 ];
 
-const INITIAL_WATER_LABS = [
-  { id: 'WLAB-001', well_id: 'W001-P1', sample_code: 'P1', sample_date: '2026-05-20', lab_name: 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่', standard_type: 'DOH_2543', collector: 'เจ้าหน้าที่ สสอ.แม่อาย', ph: '7.1', colour: '5', turbidity: '3.2', tds: '245', hardness: '120', fe: '0.22', mn: '0.09', cu: '0.04', zn: '0.18', pb: '0.002', cr: '0.004', cd: '0.0005', as_val: '0.004', hg: '0.1', so4: '38', cl: '22', no3: '6.5', f: '0.28', residual_cl: '', total_coliform: '0', faecal_coliform: '0', overall_status: 'ผ่านเกณฑ์มาตรฐาน', failed_params: '', notes: 'บ่อน้ำตื้น ม.3 ต.ท่าตอน ผลตรวจสารหนูและโลหะหนักอยู่ในเกณฑ์มาตรฐาน' },
-  { id: 'WLAB-002', well_id: 'W002-P2', sample_code: 'P2', sample_date: '2026-05-20', lab_name: 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่', standard_type: 'DOH_2543', collector: 'เจ้าหน้าที่ สสอ.แม่อาย', ph: '6.9', colour: '8', turbidity: '4.8', tds: '310', hardness: '155', fe: '0.41', mn: '0.15', cu: '0.05', zn: '0.25', pb: '0.003', cr: '0.005', cd: '0.0006', as_val: '0.006', hg: '0.12', so4: '42', cl: '28', no3: '8.2', f: '0.31', residual_cl: '', total_coliform: '0', faecal_coliform: '0', overall_status: 'ผ่านเกณฑ์มาตรฐาน', failed_params: '', notes: 'บ่อน้ำตื้น ม.3 ต.ท่าตอน ผ่านเกณฑ์มาตรฐานกรมอนามัย' },
-  { id: 'WLAB-003', well_id: 'W003-P3', sample_code: 'P3', sample_date: '2026-05-20', lab_name: 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่', standard_type: 'DOH_2543', collector: 'เจ้าหน้าที่ สสอ.แม่อาย', ph: '6.7', colour: '12', turbidity: '14.5', tds: '390', hardness: '180', fe: '0.68', mn: '0.35', cu: '0.06', zn: '0.30', pb: '0.004', cr: '0.006', cd: '0.0008', as_val: '0.008', hg: '0.15', so4: '55', cl: '34', no3: '9.0', f: '0.35', residual_cl: '', total_coliform: '4', faecal_coliform: '0', overall_status: 'เกินเกณฑ์มาตรฐาน', failed_params: 'ความขุ่น (Turbidity), เหล็ก (Fe), แมงกานีส (Mn), โคลิฟอร์มแบคทีเรีย (Total Coliform Bacteria)', notes: 'สารหนูไม่เกินเกณฑ์ (0.008 mg/L) แต่พบความขุ่น เหล็ก แมงกานีส และโคลิฟอร์มเกินเกณฑ์น้ำประปา แนะนำต้มสุกและติดตั้งถังกรองสนิมเหล็ก' },
-  { id: 'WLAB-004', well_id: 'W004-P4', sample_code: 'P4', sample_date: '2026-05-20', lab_name: 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่', standard_type: 'DOH_2543', collector: 'เจ้าหน้าที่ สสอ.แม่อาย', ph: '7.3', colour: '5', turbidity: '2.8', tds: '220', hardness: '110', fe: '0.19', mn: '0.07', cu: '0.03', zn: '0.15', pb: '0.001', cr: '0.003', cd: '0.0004', as_val: '0.003', hg: '0.08', so4: '30', cl: '18', no3: '5.4', f: '0.24', residual_cl: '', total_coliform: '0', faecal_coliform: '0', overall_status: 'ผ่านเกณฑ์มาตรฐาน', failed_params: '', notes: 'ผลตรวจปกติทุกพารามิเตอร์' },
-  { id: 'WLAB-005', well_id: 'W005-P5', sample_code: 'P5', sample_date: '2026-05-21', lab_name: 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่', standard_type: 'DOH_2543', collector: 'เจ้าหน้าที่ รพ.สต.บ้านท่าตอน', ph: '7.0', colour: '6', turbidity: '3.9', tds: '265', hardness: '135', fe: '0.28', mn: '0.11', cu: '0.04', zn: '0.20', pb: '0.002', cr: '0.004', cd: '0.0005', as_val: '0.005', hg: '0.10', so4: '35', cl: '24', no3: '7.1', f: '0.29', residual_cl: '', total_coliform: '0', faecal_coliform: '0', overall_status: 'ผ่านเกณฑ์มาตรฐาน', failed_params: '', notes: 'ผลตรวจปกติทุกพารามิเตอร์' }
-];
+const INITIAL_WATER_LABS = SOURCE_WATER_LABS;
 
 const INITIAL_KNOWLEDGE_DOCS = [
   {
@@ -3693,7 +1839,7 @@ const INITIAL_KNOWLEDGE_DOCS = [
     author: 'กองโรคจากการประกอบอาชีพและสิ่งแวดล้อม กรมควบคุมโรค (กันยายน 2569)',
     date: '2026-09-01',
     description: 'คู่มือปฏิบัติงานฉบับหลักสำหรับบุคลากรสาธารณสุข ครอบคลุมข้อมูลพิษวิทยาสารหนู การประเมินความเสี่ยง HRA (HQ & Cancer Risk) แนวทางเฝ้าระวังเชิงรับ-เชิงรุก รหัส ICD-10 (Z13.88, R82.6, T57) การสอบสวนโรค การเก็บปัสสาวะ และภาคผนวกแบบฟอร์ม Env-As-01, 02, 03 และแบบตรวจร่างกายโดยแพทย์',
-    file_url: 'แนวทางการเฝ้าระวังผลกระทบต่อสุขภาพประชา.pdf',
+    file_url: 'docs/arsenic-surveillance-guideline.pdf',
     file_type: 'pdf',
     is_builtin: true
   },
@@ -3713,9 +1859,9 @@ const INITIAL_KNOWLEDGE_DOCS = [
     title: 'แบบฟอร์ม Env-As-01: แบบคัดกรองและประเมินความเสี่ยงทางสุขภาพประชาชน ระดับบุคคล (ฉบับ อ.แม่อาย)',
     category: 'แบบฟอร์มคัดกรอง/สอบสวนโรค',
     author: 'กองโรคจากการประกอบอาชีพและสิ่งแวดล้อม กรมควบคุมโรค',
-    date: '2026-05-22',
+    date: '',
     description: 'ไฟล์ต้นฉบับ PDF แบบคัดกรองและประเมินความเสี่ยงการสัมผัสสารหนู ระดับบุคคล (ส่วนที่ 1-4 พร้อมตารางคำนวณคะแนนถ่วงน้ำหนัก 11 ข้อ คะแนนเต็ม 30.5 คะแนน)',
-    file_url: 'Env-As-01_22.05.69(แม่อาย).pdf',
+    file_url: 'docs/Env-As-01-original.pdf',
     file_type: 'pdf',
     is_builtin: true
   },
@@ -3726,259 +1872,16 @@ const INITIAL_KNOWLEDGE_DOCS = [
     author: 'กองโรคจากการประกอบอาชีพและสิ่งแวดล้อม กรมควบคุมโรค',
     date: '2026-04-29',
     description: 'ไฟล์ต้นฉบับ PDF แบบซักประวัติก่อนเก็บตัวอย่างปัสสาวะส่งตรวจทางห้องปฏิบัติการ (ปรับปรุง 29 เม.ย. 69) สำหรับประเมินแหล่งน้ำดื่ม น้ำใช้ อาหารทะเล และยาสมุนไพร',
-    file_url: 'Env-As-02 (ปรับปรุง_290469).pdf',
+    file_url: 'docs/Env-As-02-original.pdf',
     file_type: 'pdf',
     is_builtin: true
   }
 ];
 
-function checkSingleParam(paramDef, rawVal, stdType) {
-  if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
-    return { status: 'NA', label: 'ไม่ได้ตรวจ' };
-  }
-  const num = parseFloat(rawVal);
-  if (isNaN(num)) return { status: 'NA', label: 'ไม่ได้ตรวจ' };
-
-  const threshold = paramDef[stdType || 'DOH_2543'];
-  if (threshold === null || threshold === undefined) {
-    return { status: 'PASS', label: 'ผ่านเกณฑ์' };
-  }
-
-  if (paramDef.type === 'range' || paramDef.type === 'range_opt') {
-    const [minV, maxV] = threshold;
-    if (num >= minV && num <= maxV) {
-      return { status: 'PASS', label: `ผ่าน (${minV}-${maxV})` };
-    }
-    return { status: 'FAIL', label: `ไม่ผ่าน (เกณฑ์ ${minV}-${maxV})` };
-  } else {
-    if (num <= threshold) {
-      return { status: 'PASS', label: `ผ่าน (≤${threshold})` };
-    }
-    return { status: 'FAIL', label: `เกินเกณฑ์ (> ${threshold})` };
-  }
-}
-
-function evaluateWaterLabRecord(rec) {
-  const stdType = rec.standard_type || 'DOH_2543';
-  let testedCount = 0;
-  const failedNames = [];
-
-  WATER_LAB_PARAMS.forEach(p => {
-    const res = checkSingleParam(p, rec[p.key], stdType);
-    if (res.status !== 'NA') {
-      testedCount++;
-      if (res.status === 'FAIL') {
-        failedNames.push(p.name);
-      }
-    }
-  });
-
-  const overallStatus = failedNames.length > 0 ? 'เกินเกณฑ์มาตรฐาน' : 'ผ่านเกณฑ์มาตรฐาน';
-  return { testedCount, failedNames, overallStatus };
-}
-
-function renderWaterLabDashboardAndTable() {
-  const labs = state.waterLabs || [];
-  const totalLabs = Math.max(1, labs.length);
-  const passCount = labs.filter(l => l.overall_status === 'ผ่านเกณฑ์มาตรฐาน').length;
-  const failCount = labs.filter(l => l.overall_status === 'เกินเกณฑ์มาตรฐาน').length;
-  const heavyMetalFail = labs.filter(l => {
-    const std = l.standard_type || 'DOH_2543';
-    return ['as_val', 'pb', 'cd', 'cr', 'hg'].some(k => {
-      const pDef = WATER_LAB_PARAMS.find(p => p.key === k);
-      return checkSingleParam(pDef, l[k], std).status === 'FAIL';
-    });
-  }).length;
-
-  const statusChart = document.getElementById('chart-waterlab-status');
-  if (statusChart) {
-    const bars = [
-      { label: 'ผ่านเกณฑ์มาตรฐานทุกพารามิเตอร์ที่ตรวจ', count: passCount, color: '#16a34a' },
-      { label: 'พบพารามิเตอร์เกินเกณฑ์มาตรฐาน (ต้องปรับปรุง/เฝ้าระวัง)', count: failCount, color: '#dc2626' },
-      { label: 'พบสารหนู (As) หรือโลหะหนักมีพิษเกินเกณฑ์', count: heavyMetalFail, color: '#991b1b' }
-    ];
-    statusChart.innerHTML = bars.map(b => {
-      const pct = ((b.count / totalLabs) * 100).toFixed(1);
-      return `
-        <div class="bar-row">
-          <div class="bar-label-line"><span>${b.label}</span><strong>${b.count} ตัวอย่าง (${pct}%)</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${b.color};"></div></div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  const paramChart = document.getElementById('chart-waterlab-params');
-  if (paramChart) {
-    const failCounts = WATER_LAB_PARAMS.map(p => {
-      const c = labs.filter(l => checkSingleParam(p, l[p.key], l.standard_type || 'DOH_2543').status === 'FAIL').length;
-      return { name: p.name, count: c };
-    }).filter(x => x.count > 0).sort((a, b) => b.count - a.count).slice(0, 5);
-
-    if (failCounts.length === 0) {
-      paramChart.innerHTML = `<div style="padding:18px; text-align:center; color:#16a34a; font-weight:600;"><i class="fa-solid fa-circle-check"></i> ตัวอย่างน้ำทั้งหมดในระบบผ่านเกณฑ์มาตรฐานทุกพารามิเตอร์</div>`;
-    } else {
-      paramChart.innerHTML = failCounts.map(fc => {
-        const pct = ((fc.count / totalLabs) * 100).toFixed(1);
-        return `
-          <div class="bar-row">
-            <div class="bar-label-line"><span>${fc.name}</span><strong>เกินเกณฑ์ ${fc.count} บ่อ (${pct}%)</strong></div>
-            <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:#f97316;"></div></div>
-          </div>
-        `;
-      }).join('');
-    }
-  }
-
-  renderWaterLabTable();
-}
-
-function renderWaterLabTable() {
-  const tbody = document.getElementById('waterlab-table-body');
-  if (!tbody) return;
-
-  const q = (document.getElementById('waterlab-search')?.value || '').toLowerCase().trim();
-  const wellFilter = document.getElementById('waterlab-filter-well')?.value || 'ALL';
-  const resFilter = document.getElementById('waterlab-filter-result')?.value || 'ALL';
-  const stdFilter = document.getElementById('waterlab-filter-std')?.value || 'ALL';
-
-  const filtered = (state.waterLabs || []).filter(item => {
-    if (wellFilter !== 'ALL' && item.well_id !== wellFilter) return false;
-    if (resFilter !== 'ALL' && item.overall_status !== resFilter) return false;
-    if (stdFilter !== 'ALL' && item.standard_type !== stdFilter) return false;
-    if (q) {
-      const w = state.wells.find(x => x.well_id === item.well_id);
-      const hay = `${item.id} ${item.sample_code} ${item.well_id} ${w ? w.well_name + ' ' + w.tambon : ''} ${item.failed_params} ${item.notes}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
-  const fmtVal = (rec, key) => {
-    const v = rec[key];
-    if (v === undefined || v === null || v === '') return '<span style="color:#94a3b8;">-</span>';
-    const pDef = WATER_LAB_PARAMS.find(p => p.key === key);
-    const res = checkSingleParam(pDef, v, rec.standard_type || 'DOH_2543');
-    if (res.status === 'FAIL') {
-      return `<span class="lab-fail" title="${res.label}">${v} ⚠️</span>`;
-    }
-    return `<span class="lab-pass" title="${res.label}">${v}</span>`;
-  };
-
-  tbody.innerHTML = filtered.map(item => {
-    const w = state.wells.find(x => x.well_id === item.well_id);
-    const evalInfo = evaluateWaterLabRecord(item);
-    const statusBadge = item.overall_status === 'เกินเกณฑ์มาตรฐาน'
-      ? `<span class="risk-badge risk-high">เกินเกณฑ์ (${evalInfo.failedNames.length} ตัว)</span>`
-      : `<span class="risk-badge risk-low">ผ่านเกณฑ์มาตรฐาน</span>`;
-
-    return `
-      <tr>
-        <td><b>${item.sample_code || item.id}</b><div style="font-size:11px; color:#64748b;">${item.lab_name || '-'}</div></td>
-        <td>${item.sample_date || '-'}</td>
-        <td>
-          <b>${item.well_id}</b>
-          ${w ? `<div style="font-size:11.5px; color:#0f766e;">${w.well_name}</div>` : ''}
-        </td>
-        <td>${w ? `${w.well_type}<br/><small>ม.${w.moo} ต.${w.tambon}</small>` : '-'}</td>
-        <td class="text-center">${fmtVal(item, 'as_val')}</td>
-        <td style="font-size:12px;">
-          pH: ${fmtVal(item, 'ph')} | ขุ่น: ${fmtVal(item, 'turbidity')}<br/>TDS: ${fmtVal(item, 'tds')}
-        </td>
-        <td style="font-size:12px;">
-          Fe: ${fmtVal(item, 'fe')}<br/>Mn: ${fmtVal(item, 'mn')}
-        </td>
-        <td style="font-size:12px;">
-          Pb: ${fmtVal(item, 'pb')} | Cd: ${fmtVal(item, 'cd')}<br/>Hg: ${fmtVal(item, 'hg')}
-        </td>
-        <td style="font-size:12px;">
-          Total: ${fmtVal(item, 'total_coliform')}<br/>Faecal: ${fmtVal(item, 'faecal_coliform')}
-        </td>
-        <td style="font-size:11.5px; max-width:190px;">
-          ตรวจรวม <b>${evalInfo.testedCount}/21</b> ตัว
-          ${evalInfo.failedNames.length > 0 ? `<div style="color:#b91c1c; font-weight:600; margin-top:2px;">ไม่ผ่าน: ${evalInfo.failedNames.join(', ')}</div>` : ''}
-          ${item.notes ? `<div style="color:#64748b; margin-top:2px;">${item.notes}</div>` : ''}
-        </td>
-        <td>${statusBadge}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-sm btn-primary" onclick="openWaterLabModal('${item.id}')" title="แก้ไขผลแล็บ"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-sm btn-danger" onclick="deleteWaterLab('${item.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function buildWaterLabParamsInputs(existingRecord = null) {
-  const tbody = document.getElementById('wlab-params-tbody');
-  if (!tbody) return;
-
-  tbody.innerHTML = WATER_LAB_PARAMS.map(p => {
-    const val = existingRecord && existingRecord[p.key] !== undefined ? existingRecord[p.key] : '';
-    return `
-      <tr ${p.secId ? `id="${p.secId}"` : ''}>
-        <td class="text-center"><b>${p.seq}</b></td>
-        <td><b>${p.name}</b></td>
-        <td class="text-center">${p.unit}</td>
-        <td class="text-center">${p.whoLabel}</td>
-        <td class="text-center">${p.ruralLabel}</td>
-        <td class="text-center" style="background:#f0fdf4; font-weight:700; color:#0f766e;">${p.dohLabel}</td>
-        <td class="text-center">
-          <input type="number" step="any" class="lab-param-input" id="wlab-inp-${p.key}" value="${val}" placeholder="เว้นว่างหากไม่ตรวจ" oninput="evaluateAllWaterLabInputs()" />
-        </td>
-        <td class="text-center" id="wlab-badge-${p.key}">
-          <span class="lab-na">ไม่ได้ตรวจ</span>
-        </td>
-      </tr>
-    `;
-  }).join('');
-
-  evaluateAllWaterLabInputs();
-}
-
-function evaluateAllWaterLabInputs() {
-  const stdType = document.getElementById('wlab-standard-type')?.value || 'DOH_2543';
-  let tested = 0;
-  let failed = 0;
-  const failedList = [];
-
-  WATER_LAB_PARAMS.forEach(p => {
-    const inp = document.getElementById(`wlab-inp-${p.key}`);
-    const badgeCell = document.getElementById(`wlab-badge-${p.key}`);
-    if (!inp || !badgeCell) return;
-
-    const res = checkSingleParam(p, inp.value, stdType);
-    if (res.status === 'NA') {
-      badgeCell.innerHTML = `<span class="lab-na">ไม่ได้ตรวจ</span>`;
-    } else if (res.status === 'PASS') {
-      tested++;
-      badgeCell.innerHTML = `<span class="lab-pass"><i class="fa-solid fa-check"></i> ${res.label}</span>`;
-    } else {
-      tested++;
-      failed++;
-      failedList.push(p.name);
-      badgeCell.innerHTML = `<span class="lab-fail"><i class="fa-solid fa-triangle-exclamation"></i> ${res.label}</span>`;
-    }
-  });
-
-  const sumEl = document.getElementById('wlab-live-summary');
-  const badgeEl = document.getElementById('wlab-live-badge');
-  if (sumEl && badgeEl) {
-    if (tested === 0) {
-      sumEl.textContent = 'ยังไม่ได้กรอกค่าพารามิเตอร์';
-      badgeEl.className = 'badge-risk risk-low';
-      badgeEl.textContent = 'รอการกรอกข้อมูล';
-    } else if (failed === 0) {
-      sumEl.textContent = `ตรวจ ${tested} พารามิเตอร์ — ผ่านเกณฑ์มาตรฐานครบทุกตัว`;
-      badgeEl.className = 'badge-risk risk-low';
-      badgeEl.textContent = 'ผ่านเกณฑ์มาตรฐาน';
-    } else {
-      sumEl.textContent = `ตรวจ ${tested} พารามิเตอร์ — เกินเกณฑ์ ${failed} ตัว (${failedList.join(', ')})`;
-      badgeEl.className = 'badge-risk risk-high';
-      badgeEl.textContent = `เกินเกณฑ์มาตรฐาน (${failed} ตัว)`;
-    }
-  }
-}
+INITIAL_KNOWLEDGE_DOCS.push(
+ {id:'SYSTEM-AS01-2Q',title:'AS-01 ฉบับใช้กับระบบ พร้อมข้อมูลเพิ่มเติมและ 2Q',category:'แบบฟอร์มคัดกรอง/สอบสวนโรค',author:'งานควบคุมโรค โรงพยาบาลแม่อาย',date:'2026-10-31',description:'แบบฟอร์มต้นฉบับครบ 3 หน้า พร้อมแผ่น Lab Code ข้อมูลสำหรับระบบ ระยะเวลาสัมผัส และคัดกรอง 2Q สำหรับพิมพ์ใช้งาน',file_url:'docs/Env-As-01-system-2Q.pdf',file_type:'pdf',is_builtin:true},
+ {id:'SYSTEM-AS02-2Q',title:'AS-02 ฉบับใช้กับระบบ พร้อมข้อมูลเพิ่มเติมและ 2Q',category:'แบบฟอร์มคัดกรอง/สอบสวนโรค',author:'งานควบคุมโรค โรงพยาบาลแม่อาย',date:'2026-10-31',description:'แบบฟอร์มต้นฉบับครบ 3 หน้า ข้อ 6–7 มีจำนวนปีต่อแหล่ง พร้อมแผ่น Lab Code ระยะเวลาสัมผัส และ 2Q สำหรับพิมพ์ใช้งาน',file_url:'docs/Env-As-02-system-2Q.pdf',file_type:'pdf',is_builtin:true}
+);
 
 function onWaterLabWellChange() {
   const wellId = document.getElementById('wlab-well-id')?.value;
@@ -4005,17 +1908,21 @@ function openWaterLabModal(labId = null, preselectWellId = null) {
   document.querySelectorAll('#water-lab-form .other-input-wrap').forEach(w => { w.style.display = 'none'; });
   populateWellDropdowns();
 
+  document.getElementById('wlab-point-name').value='';
+  document.getElementById('wlab-source-unit').value='';
   if (labId) {
     const rec = state.waterLabs.find(x => x.id === labId);
     if (!rec) return;
     title.innerHTML = `<i class="fa-solid fa-pen-to-square"></i> แก้ไขผลตรวจวิเคราะห์คุณภาพน้ำ (${rec.sample_code || rec.id})`;
+    document.getElementById('wlab-point-name').value=rec.point_name||'';
+    document.getElementById('wlab-source-unit').value=rec.source_unit||'';
     document.getElementById('wlab-id').value = rec.id;
     document.getElementById('wlab-well-id').value = rec.well_id;
     document.getElementById('wlab-sample-code').value = rec.sample_code || '';
-    document.getElementById('wlab-sample-date').value = rec.sample_date || new Date().toISOString().slice(0, 10);
-    document.getElementById('wlab-standard-type').value = rec.standard_type || 'DOH_2543';
-    setSelectOrOther('wlab-lab-select', 'wlab-lab-other-wrap', 'wlab-lab-other', rec.lab_name || 'ศูนย์วิทยาศาสตร์การแพทย์ที่ 1 เชียงใหม่');
-    document.getElementById('wlab-collector').value = rec.collector || 'เจ้าหน้าที่สาธารณสุข';
+    document.getElementById('wlab-sample-date').value = rec.sample_date || '';
+    document.getElementById('wlab-standard-type').value = rec.standard_type || 'SOURCE_SSO';
+    setSelectOrOther('wlab-lab-select', 'wlab-lab-other-wrap', 'wlab-lab-other', rec.lab_name || '');
+    document.getElementById('wlab-collector').value = rec.collector || '';
     document.getElementById('wlab-notes').value = rec.notes || '';
     buildWaterLabParamsInputs(rec);
   } else {
@@ -4024,7 +1931,7 @@ function openWaterLabModal(labId = null, preselectWellId = null) {
     if (preselectWellId) {
       document.getElementById('wlab-well-id').value = preselectWellId;
     }
-    document.getElementById('wlab-sample-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('wlab-sample-date').value = bangkokToday();
     onWaterLabWellChange();
     buildWaterLabParamsInputs(null);
   }
@@ -4040,14 +1947,18 @@ function closeWaterLabModal() {
 
 async function handleSaveWaterLab(e) {
   e.preventDefault();
-  const id = document.getElementById('wlab-id').value || `WLAB-${String(state.waterLabs.length + 1).padStart(3, '0')}`;
+  const id = document.getElementById('wlab-id').value || `WLAB-${Date.now()}`;
   const wellId = document.getElementById('wlab-well-id').value;
 
   const rec = {
+    ...(state.waterLabs.find(x => x.id === id) || {}),
     id,
     well_id: wellId,
+    match_status: wellId ? 'ผู้ใช้ยืนยันการจับคู่' : 'รอจับคู่ทะเบียน',
     sample_code: document.getElementById('wlab-sample-code').value.trim(),
     sample_date: document.getElementById('wlab-sample-date').value,
+    point_name:document.getElementById('wlab-point-name').value.trim(),
+    source_unit:document.getElementById('wlab-source-unit').value.trim(),
     standard_type: document.getElementById('wlab-standard-type').value,
     lab_name: getSelectOrOther('wlab-lab-select', 'wlab-lab-other'),
     collector: document.getElementById('wlab-collector').value.trim(),
@@ -4060,6 +1971,7 @@ async function handleSaveWaterLab(e) {
     rec[p.key] = inp && inp.value.trim() !== '' ? inp.value.trim() : '';
   });
 
+  rec.fiscal_year=recordFiscalYear(rec,'water');
   const evalRes = evaluateWaterLabRecord(rec);
   rec.overall_status = evalRes.overallStatus;
   rec.failed_params = evalRes.failedNames.join(', ');
@@ -4076,7 +1988,7 @@ async function handleSaveWaterLab(e) {
     }
     state.wells[wIdx].safety_status = rec.overall_status === 'เกินเกณฑ์มาตรฐาน'
       ? `ผลตรวจเกินค่ามาตรฐาน (${rec.failed_params})`
-      : 'ผลตรวจปกติ (ผ่านเกณฑ์)';
+      : rec.overall_status;
   }
 
   saveLocalData();
@@ -4099,35 +2011,6 @@ function closeWaterStandardModal() {
   document.getElementById('water-std-modal').style.display = 'none';
 }
 
-function exportWaterLabCsv() {
-  const headers = [
-    'รหัสผลแล็บ', 'รหัสตัวอย่าง', 'วันที่เก็บตัวอย่าง', 'รหัสบ่อน้ำ(well_id)', 'ชื่อจุดบ่อน้ำ',
-    'ห้องปฏิบัติการ', 'เกณฑ์เปรียบเทียบ', 'สรุปผลการตรวจ', 'พารามิเตอร์ที่ไม่ผ่านเกณฑ์',
-    ...WATER_LAB_PARAMS.map(p => `${p.name} (${p.unit})`),
-    'หมายเหตุ'
-  ];
-
-  const rows = (state.waterLabs || []).map(l => {
-    const w = state.wells.find(x => x.well_id === l.well_id);
-    return [
-      `"${l.id}"`,
-      `"${l.sample_code || ''}"`,
-      `"${l.sample_date || ''}"`,
-      `"${l.well_id || ''}"`,
-      `"${w ? w.well_name : ''}"`,
-      `"${l.lab_name || ''}"`,
-      `"${l.standard_type || 'DOH_2543'}"`,
-      `"${l.overall_status || ''}"`,
-      `"${l.failed_params || ''}"`,
-      ...WATER_LAB_PARAMS.map(p => l[p.key] !== undefined && l[p.key] !== '' ? l[p.key] : ''),
-      `"${l.notes || ''}"`
-    ];
-  });
-
-  downloadCsvFile('water_quality_lab_doh21_maeai.csv', [headers.join(','), ...rows.map(r => r.join(','))].join('\n'));
-}
-
-// ==================== KNOWLEDGE BASE / MANUALS & BUILT-IN VIEWER ====================
 function renderKnowledgeDocs() {
   const grid = document.getElementById('kb-docs-grid');
   if (!grid) return;
@@ -4224,7 +2107,7 @@ function closeKnowledgeViewer() {
 function openAddKnowledgeModal() {
   document.getElementById('kb-add-form').reset();
   document.getElementById('kb-cat-other-wrap').style.display = 'none';
-  document.getElementById('kb-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('kb-date').value = bangkokToday();
   document.getElementById('kb-add-modal').style.display = 'flex';
 }
 
@@ -4300,4 +2183,839 @@ async function deleteKnowledgeDoc(docId) {
   state.knowledgeDocs = state.knowledgeDocs.filter(d => d.id !== docId);
   saveLocalData();
   await postToGoogleSheets({ action: 'deleteKnowledgeDoc', id: docId });
+}
+
+// Fiscal-year views retain the historical source data and all later records together.
+function bangkokToday() {
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ const get=type=>parts.find(p=>p.type===type).value;return `${get('year')}-${get('month')}-${get('day')}`;
+}
+function fiscalYearFromDate(value) {
+ const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return null;
+ const year=Number(m[1]),month=Number(m[2]),day=Number(m[3]);
+ if(month<1||month>12||day<1||day>new Date(Date.UTC(year,month,0)).getUTCDate())return null;
+ return year+543+(month>=10?1:0);
+}
+function recordFiscalYear(record,stage=1) {
+ const date=stage===2?record.interview_date:stage==='water'?record.sample_date:record.survey_date;
+ return fiscalYearFromDate(date)||Number(record.fiscal_year||record.source_year)||null;
+}
+function yearRows(rows,stage=1) {return rows.filter(r=>recordFiscalYear(r,stage)===Number(state.fiscalYear||2569));}
+function canonicalTambon(tambon,moo) {
+ const raw=String(tambon||'').trim();
+ if(raw==='แม่นางวาง')return 'แม่นาวาง';
+ if(raw==='ท่่าตอน')return 'ท่าตอน';
+ if(raw==='แม่เมืองน้อย'&&Number(moo)===6)return 'แม่นาวาง';
+ return raw;
+}
+function normalizeStageRecord(record,stage) {
+ const hydrated=backfillBasicProfile(record,stage);
+ const r=stage===1?normalizeRespondentRecord(hydrated,0):{...hydrated};
+ const corrected=canonicalTambon(r.tambon,r.moo);
+ if(corrected!==r.tambon){r.source_tambon=r.source_tambon||r.tambon;r.area_correction='แก้พื้นที่ตามคำยืนยันผู้ใช้';r.tambon=corrected;}
+ r.fiscal_year=recordFiscalYear(r,stage)||2569;
+ r.source_tab=(stage===2?'เก็บแม่อาย':'ประเมินแม่อาย')+' '+r.fiscal_year;
+ return r;
+}
+function initializeFiscalYears() {
+ let saved;try{saved=localStorage.getItem('MAEAI_ONLINE_FISCAL_YEAR');}catch(e){}
+ state.fiscalYear=Number(saved)||2569;
+}
+function refreshFiscalYearOptions() {
+ const select=document.getElementById('fiscal-year-filter');if(!select)return;
+ const years=[...new Set([2569,fiscalYearFromDate(bangkokToday()),state.fiscalYear,...state.respondents.map(r=>recordFiscalYear(r,1)),...state.envAs02.map(r=>recordFiscalYear(r,2)),...state.waterLabs.map(r=>recordFiscalYear(r,'water'))].filter(Boolean))].sort((a,b)=>b-a);
+ select.innerHTML=years.map(y=>`<option value="${y}" ${y===Number(state.fiscalYear)?'selected':''}>ปีงบประมาณ ${y}</option>`).join('');
+ document.querySelectorAll('[data-fiscal-year]').forEach(el=>el.textContent=state.fiscalYear);
+ // Keep option labels and legacy headings aligned with the selected year.
+ const walk=document.createTreeWalker(document.getElementById('app-container'),NodeFilter.SHOW_TEXT);
+ for(let node=walk.nextNode();node;node=walk.nextNode()){
+  if(['SCRIPT','STYLE','TEXTAREA'].includes(node.parentElement?.tagName))continue;
+  node.nodeValue=node.nodeValue.replace(/(ประเมินแม่อาย|เก็บแม่อาย) (?:ปี )?\d{4}/g,`$1 ${state.fiscalYear}`);
+ }
+ setText('respondents-heading',`ทะเบียน Env-As-01 — ประเมินแม่อาย ${state.fiscalYear} (${yearRows(state.respondents).length} ราย)`);
+ refreshWaterLabYearOptions();
+ setText('dashboard-heading',`ระบบข้อมูลแหล่งแม่น้ำกก อ.แม่อาย — ปีงบประมาณ ${state.fiscalYear}`);
+ setText('registry-csv-label','ส่งออกทะเบียนปีที่เลือก');
+}
+function setFiscalYearFilter(value) {
+ state.fiscalYear=Number(value)||2569;
+ try{localStorage.setItem('MAEAI_ONLINE_FISCAL_YEAR',String(state.fiscalYear));}catch(e){}
+ refreshAllViews();
+}
+function formatSampleDate(value) {
+ if(!fiscalYearFromDate(value))return value||'ไม่ระบุวันที่';
+ return new Date(value.slice(0,10)+'T00:00:00+07:00').toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'});
+}
+function nextWellId() {
+ let n=Math.max(0,...state.wells.map(w=>Number(String(w.well_id).match(/^W(\d+)/)?.[1])||0))+1;
+ while(state.wells.some(w=>w.well_id===`W${String(n).padStart(3,'0')}`))n++;
+ return `W${String(n).padStart(3,'0')}`;
+}
+function waterLabArea(record) {
+ const well=state.wells.find(w=>w.well_id===record.well_id);
+ const text=record.point_name||'';
+ return {tambon:canonicalTambon(record.tambon||well?.tambon||text.match(/ต\.?\s*(ท่าตอน|แม่นาวาง)/)?.[1]||'',record.moo??well?.moo),moo:record.moo??well?.moo??text.match(/(?:ม\.?|หมู่(?:ที่)?)\s*(\d+)/)?.[1]??''};
+}
+function sortedWaterLabs(rows) {
+ return [...rows].sort((a,b)=>{
+  const aa=waterLabArea(a),bb=waterLabArea(b);
+  return (aa.tambon||'๙').localeCompare(bb.tambon||'๙','th')||String(a.sample_date||'9999').localeCompare(String(b.sample_date||'9999'))||String(a.point_name||'').localeCompare(String(b.point_name||''),'th',{numeric:true})||String(a.id).localeCompare(String(b.id));
+ });
+}
+
+// Source-grounded calculations, 2569 revision. Historical source rows remain separate by stage.
+const DATA_VERSION = 'MAEAI_FISCAL_20261030_V2';
+const RELEASE_VERSION = '2026-10-31-online-auth';
+const ONLINE_API_REVISION = 'MAEAI_ONLINE_20261031';
+function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function setText(id, value) { const el=document.getElementById(id); if(el) el.textContent=value; }
+function setHtml(id, value) { const el=document.getElementById(id); if(el) el.innerHTML=value; }
+function valueOrBlank(v) { return v === null || v === undefined || v === '' ? '' : v; }
+function optionalNumber(v) { return v === null || v === undefined || String(v).trim()==='' || !Number.isFinite(Number(v)) ? null : Number(v); }
+function distanceBand(d) { return d===null ? 'ไม่ระบุ' : d<=100 ? 'ไม่เกิน 100 เมตร' : d<=200 ? '101 - 200 เมตร' : d<=300 ? '201 - 300 เมตร' : 'มากกว่า 300 เมตร'; }
+function normalizeWellRecord(w, idx) {
+  const d=optionalNumber(w.distance_river_m);
+  return {...w,seq:optionalNumber(w.seq)??idx+1,tambon:String(w.tambon||'').trim(),health_center:String(w.health_center||'').trim().replace(/^รพ\.สต\.ท่ามะแกง$/,'รพ.สต.บ้านท่ามะแกง'),distance_river_m:d,distance_band:distanceBand(d),user_count:optionalNumber(w.user_count),attachments:Array.isArray(w.attachments)?w.attachments:[]};
+}
+function normalizeRespondentRecord(r, idx) {
+  return {...r,seq:optionalNumber(r.seq)??idx+1,total_score:optionalNumber(r.total_score),risk_level:r.risk_level||'ไม่ระบุ',source_tab:r.source_tab||'บันทึกเพิ่มเติมปี 69',survey_date:r.survey_date||'',health_center:r.health_center||'',q2_1:r.q2_1||'',q2_2:r.q2_2||'',status_2q:r.status_2q||'ยังไม่คัดกรอง'};
+}
+function hasCorruptedEncoding(arr) { return !Array.isArray(arr); }
+function renderWellsTable() {
+ const q=document.getElementById('well-search')?.value||'',t=document.getElementById('well-filter-tambon')?.value||'ALL',type=document.getElementById('well-filter-type')?.value||'ALL',dist=document.getElementById('well-filter-dist')?.value||'ALL',hc=document.getElementById('well-filter-hc')?.value||'ALL';
+ const rows=state.wells.filter(w=>(t==='ALL'||w.tambon===t)&&(type==='ALL'||type==='SAMPLE_ONLY'&&w.sample_code||w.well_type===type)&&(dist==='ALL'||w.distance_band===dist)&&(hc==='ALL'||w.health_center===hc)&&(!q||[w.well_id,w.sample_code,w.well_name,w.owner_name,w.house_no,w.moo,w.tambon].join(' ').toLowerCase().includes(q.toLowerCase())));
+ setHtml('wells-table-body',rows.map(w=>`<tr><td>${w.seq}</td><td>${esc(w.sample_code||'ไม่ระบุ')}</td><td>${esc(w.well_id)}</td><td>${esc(w.well_name)}${w.source_issues?.length?'<br><small>'+esc(w.source_issues.join('; '))+'</small>':''}</td><td>บ้าน ${esc(w.house_no||'ไม่ระบุ')} ม.${esc(w.moo)} ต.${esc(w.tambon)}</td><td>${esc(w.well_type)}${w.depth_meters?' ลึก '+esc(w.depth_meters)+' ม.':''}</td><td><a href="javascript:void(0)" onclick="focusOnMap(${Number(w.latitude)},${Number(w.longitude)})">${Number(w.latitude).toFixed(5)}, ${Number(w.longitude).toFixed(5)}</a><br><small>UTM ${esc(w.utm_e)}, ${esc(w.utm_n)}</small></td><td>${w.distance_river_m===null?'ไม่ระบุ':w.distance_river_m+' ม.'}<br><small>${esc(w.distance_band)}</small></td><td>${esc(w.usage_type||'ไม่ระบุ')}</td><td><button class="btn btn-sm btn-outline" onclick="openWellGalleryModal('${esc(w.well_id)}')">${(w.attachments||[]).length} ไฟล์</button></td><td>${w.user_count===null?'ไม่ระบุ':w.user_count+' คน'}</td><td>${esc(w.health_center||'ไม่ระบุ')}</td><td><button class="btn btn-sm btn-primary" onclick="openWellModal('${esc(w.well_id)}')">แก้ไข</button> <button class="btn btn-sm btn-outline" onclick="openWaterLabForWell('${esc(w.well_id)}')">ผลตรวจ</button> <button class="btn btn-sm btn-danger" onclick="deleteWell('${esc(w.well_id)}')">ลบ</button></td></tr>`).join('')||'<tr><td colspan="13">ไม่พบข้อมูล</td></tr>');
+}
+
+// One-time enrichment of blank legacy fields. Existing values and later explicit clears survive.
+const BASIC_PROFILE_VERSION = '2026-10-31-basic-profile-v1';
+const BASIC_PROFILE_FIELDS = ['age','gender','cid','phone','house_no','amphoe','province','health_center','marital_status','education','years_in_area','weight_kg','height_cm'];
+function backfillBasicProfile(record,stage) {
+ if(record.basic_profile_backfill_version===BASIC_PROFILE_VERSION)return record;
+ const source=(stage===1?INITIAL_RESPONDENTS:INITIAL_ENV_AS02).find(r=>r.id===record.id);
+ if(!source||Number(record.fiscal_year||record.source_year||2569)!==Number(source.fiscal_year||source.source_year||2569)
+  ||historyNameKey(record.full_name)!==historyNameKey(source.full_name)
+  ||String(record.moo)!==String(source.moo)
+  ||canonicalTambon(record.tambon,record.moo)!==canonicalTambon(source.tambon,source.moo))return record;
+ const result={...record},copied=[];
+ for(const field of BASIC_PROFILE_FIELDS){
+  if(!historyValuePresent(result[field])&&historyValuePresent(source[field])){result[field]=source[field];copied.push(field);}
+ }
+ result.basic_profile_backfill_version=BASIC_PROFILE_VERSION;
+ result.basic_profile_source={...(record.basic_profile_source||source.basic_profile_source),backfilled_fields:copied};
+ return result;
+}
+function formatBasicAddress(record) {
+ return [historyValuePresent(record.house_no)?'บ้านเลขที่ '+record.house_no:'',historyValuePresent(record.moo)?'ม.'+record.moo:'',record.tambon?'ต.'+record.tambon:'',record.amphoe?'อ.'+record.amphoe:'',record.province?'จ.'+record.province:''].filter(Boolean).join(' ')||'ไม่ระบุ';
+}
+function googleMapsUrl(latitude,longitude) {
+ if(!historyValuePresent(latitude)||!historyValuePresent(longitude))return '';
+ const lat=Number(latitude),lng=Number(longitude);
+ if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)return '';
+ return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lat+','+lng);
+}
+function wellGoogleMapsLink(latitude,longitude) {
+ const url=googleMapsUrl(latitude,longitude);
+ return url?`<a class="btn btn-sm btn-outline google-maps-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">เปิดใน Google Maps</a>`:'';
+}
+async function copyRespondentCid(id) {
+ const record=state.respondents.find(r=>r.id===id)||state.envAs02.find(r=>r.id===id);
+ if(!historyValuePresent(record?.cid))return;
+ try{
+  if(!navigator.clipboard?.writeText)throw Error('clipboard unavailable');
+  await navigator.clipboard.writeText(String(record.cid));
+  alert('คัดลอกเลขประจำตัวประชาชนแล้ว');
+ }catch(e){prompt('คัดลอกเลขประจำตัวประชาชนจากช่องนี้',String(record.cid));}
+}
+
+
+function waterHistoryRevision(){return {completed:true,pending_ids:[]};}
+function mergeCloudWaterLabHistory(incoming){return incoming.map(r=>({...r}));}
+function waterLabYearRows(){
+ const year=state.waterLabYear||'ALL';
+ return (state.waterLabs||[]).filter(r=>year==='ALL'||recordFiscalYear(r,'water')===Number(year));
+}
+function refreshWaterLabYearOptions(){
+ const select=document.getElementById('waterlab-filter-year');
+ const years=[...new Set((state.waterLabs||[]).map(r=>recordFiscalYear(r,'water')).filter(Boolean))].sort((a,b)=>b-a);
+ if(!state.waterLabYear)state.waterLabYear='ALL';
+ if(select){select.innerHTML='<option value="ALL">ทุกปี — เปรียบเทียบผลย้อนหลัง</option>'+years.map(y=>`<option value="${y}">ปีงบประมาณ ${y}</option>`).join('');select.value=state.waterLabYear;}
+ setText('waterlab-heading','ผลตรวจแหล่งน้ำในชุมชน สสอ. — '+(state.waterLabYear==='ALL'?'ทุกปี':`ปีงบประมาณ ${state.waterLabYear}`));
+ setText('nav-lab-count',waterLabYearRows().length);
+}
+function setWaterLabYear(value){state.waterLabYear=value||'ALL';try{localStorage.setItem('MAEAI_ONLINE_WATERLAB_YEAR',state.waterLabYear);}catch(e){}renderWaterLabDashboardAndTable();}
+
+function loadLocalData() {
+ state.loadWarnings=[];state.sessionEpoch=0;state.pendingWrites=[];state.activeCloudRequests=new Set();
+ state.cleanModalTitles=Array.from(document.querySelectorAll('.modal-backdrop h3[id]')).map(el=>[el.id,el.innerHTML]);
+ for(const key of ['wells','respondents','envAs02','waterLabs','knowledgeDocs'])state[key]=[];
+ let configured='';try{configured=localStorage.getItem(STORAGE_KEY_GAS_URL)||'';state.waterLabYear=localStorage.getItem('MAEAI_ONLINE_WATERLAB_YEAR')||'ALL';}catch(e){}
+ applyRestoredGasUrl(validGasUrl(configured)?configured:DEFAULT_GAS_URL);
+ initializeFiscalYears();
+}
+function riskBars(rows) {
+  return ['ต่ำ','ปานกลาง','มาก','ไม่ระบุ'].map((level,i)=>{const count=rows.filter(r=>(r.risk_level||'ไม่ระบุ')===level).length;if(!count&&level==='ไม่ระบุ')return '';const pct=rows.length?100*count/rows.length:0;return `<div class="bar-row"><div class="bar-label-line"><span>${level} (ตามต้นฉบับ)</span><strong>${count} รายการ (${pct.toFixed(1)}%)</strong></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${['#16a34a','#f97316','#dc2626','#64748b'][i]}"></div></div></div>`;}).join('');
+}
+function bars(items, denominator) {
+ return items.map(([label,count,color])=>{const pct=denominator?count/denominator*100:0;return `<div class="bar-row"><div class="bar-label-line"><span>${esc(label)}</span><strong>${count} (${pct.toFixed(1)}%)</strong></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color||'#0284c7'}"></div></div></div>`;}).join('');
+}
+function updateKpiCards() {
+ const a=yearRows(state.respondents),b=yearRows(state.envAs02,2),w=state.wells;
+ setText('nav-well-count',w.length);setText('nav-resp-count',a.length);setText('nav-lab-count',waterLabYearRows().length);
+ setText('kpi-total-wells',w.length);setText('kpi-well-sub',`บาดาล ${w.filter(x=>x.well_type==='บ่อบาดาล').length} | น้ำตื้น ${w.filter(x=>x.well_type==='บ่อน้ำตื้น').length} | ประปาภูเขา ${w.filter(x=>x.well_type==='ประปาภูเขา').length}`);
+ setText('kpi-sample-wells',w.filter(x=>x.sample_code).length);setText('kpi-near-wells',w.filter(x=>x.distance_river_m!==null&&x.distance_river_m<=100).length);
+ setText('kpi-total-resp',`${a.length} / ${b.length}`);setText('kpi-tambon-sub','Env-As-01 / กลุ่มซักประวัติและเก็บปัสสาวะ (แยกขั้นตอน)');
+ setText('kpi-risk-alert',a.filter(x=>['ปานกลาง','มาก'].includes(x.risk_level)).length);setText('kpi-risk-sub',['ต่ำ','ปานกลาง','มาก'].map(k=>`${k} ${a.filter(x=>x.risk_level===k).length}`).join(' | '));
+ setText('dash-tab1-total',a.length);setText('dash-tab2-total',b.length);setText('screening-risk-caption',['ต่ำ','ปานกลาง','มาก'].map(k=>`${k} ${a.filter(x=>x.risk_level===k).length} ราย`).join(' | '));
+ setText('dynamic-source-notice',`ปีงบประมาณ ${state.fiscalYear}: Env-As-01 ${a.length} ราย → Env-As-02/เก็บปัสสาวะ ${b.length} ราย เป็นการติดตาม ไม่บวกเป็นจำนวนคนใหม่`);
+}
+function renderExecutiveDashboard() {
+ const wells=state.wells,a=yearRows(state.respondents),b=yearRows(state.envAs02,2);
+ setHtml('chart-well-types',bars(['บ่อน้ำตื้น','บ่อบาดาล','ประปาภูเขา'].map(k=>[k,wells.filter(x=>x.well_type===k).length]),wells.length));
+ setHtml('chart-well-distance',bars(['ไม่เกิน 100 เมตร','101 - 200 เมตร','201 - 300 เมตร','มากกว่า 300 เมตร','ไม่ระบุ'].map(k=>[k,wells.filter(x=>x.distance_band===k).length]),wells.length));
+ const hcs=[...new Set(wells.map(w=>w.health_center||'ไม่ระบุ'))];
+ setHtml('chart-well-hc',bars(hcs.map(h=>[h,wells.filter(w=>(w.health_center||'ไม่ระบุ')===h).length]),wells.length));
+ setHtml('chart-resp-tab1-risk',riskBars(a));setHtml('chart-resp-tab2-risk',riskBars(b));
+ const counts=(rows)=>['ต่ำ','ปานกลาง','มาก'].map(k=>rows.filter(x=>x.risk_level===k).length);
+ setHtml('dash-risk-matrix-tab1-body',['ต่ำ','ปานกลาง','มาก'].map(k=>`<tr><td>${k}</td><td>ตามต้นฉบับ</td><td>${a.filter(x=>x.risk_level===k&&x.tambon==='ท่าตอน').length}</td><td>${a.filter(x=>x.risk_level===k&&x.tambon==='แม่นาวาง').length}</td><td>${a.filter(x=>x.risk_level===k).length}</td><td>ติดตามตามผลประเมินต้นฉบับ</td></tr>`).join(''));
+ setHtml('dash-pivot-tab2-body',['ต่ำ','ปานกลาง','มาก'].map(k=>`<tr><td>ความเสี่ยง${k} (เก็บแม่อาย ${state.fiscalYear})</td><td>${b.filter(x=>x.risk_level===k&&x.tambon==='ท่าตอน').length}</td><td>${b.filter(x=>x.risk_level===k&&x.tambon==='แม่นาวาง').length}</td><td>${b.filter(x=>x.risk_level===k).length}</td></tr>`).join('')+`<tr><td>รวมกลุ่ม Env-As-02 / เก็บปัสสาวะ</td><td colspan="3">${b.length} รายการ</td></tr>`);
+ const areas=['ท่าตอน','แม่นาวาง',...[...new Set([...a,...b].map(x=>x.tambon))].filter(t=>t&&!['ท่าตอน','แม่นาวาง'].includes(t))];
+ setHtml('dash-resp-by-tambon-body',areas.map(t=>{const aa=a.filter(x=>x.tambon===t),bb=b.filter(x=>x.tambon===t);return `<tr><td>${esc(t)}</td>${[aa.length,...counts(aa),bb.length,...counts(bb)].map(v=>`<td>${v}</td>`).join('')}</tr>`;}).join(''));
+ const healthCenters=[...new Set([...a,...b].map(r=>r.health_center||'ไม่ระบุ'))];
+ setHtml('dash-resp-by-hc-body',healthCenters.map(h=>{const aa=a.filter(r=>(r.health_center||'ไม่ระบุ')===h),bb=b.filter(r=>(r.health_center||'ไม่ระบุ')===h);return `<tr><td>${esc(h)}</td><td>${esc([...new Set([...aa,...bb].map(r=>r.tambon).filter(Boolean))].join(', '))}</td>${[aa.length,...counts(aa),bb.length,...counts(bb)].map(v=>`<td>${v}</td>`).join('')}</tr>`;}).join(''));
+ const keys=[...new Set([...a,...b].map(x=>x.tambon+'|'+x.moo))].sort((x,y)=>x.localeCompare(y,'th',{numeric:true}));
+ setHtml('dash-resp-by-moo-body',keys.map(k=>{const aa=a.filter(x=>x.tambon+'|'+x.moo===k),bb=b.filter(x=>x.tambon+'|'+x.moo===k);const [t,m]=k.split('|');const known=aa.filter(r=>historyValuePresent(r.exposure_years));const hc=[...new Set([...aa,...bb].map(r=>r.health_center).filter(Boolean))].join(', ')||'ไม่ระบุ';return `<tr><td>${esc(t)}</td><td>${esc(m)}</td><td>${esc(hc)}</td>${[aa.length,...counts(aa),bb.length,...counts(bb)].map(v=>`<td>${v}</td>`).join('')}<td>${known.length?'ระบุ '+known.length+'/'+aa.length+' ราย':'ยังไม่มีข้อมูล'}</td></tr>`;}).join(''));
+ const wk=[...new Set(wells.map(x=>x.tambon+'|'+x.moo))].sort();
+ setHtml('dash-moo-breakdown-body',wk.map(k=>{const group=wells.filter(x=>x.tambon+'|'+x.moo===k),known=group.filter(x=>x.user_count!==null),sum=known.reduce((v,x)=>v+x.user_count,0);const [t,m]=k.split('|');return `<tr><td>${esc(t)}</td><td>${esc(m)}</td>${['บ่อน้ำตื้น','บ่อบาดาล','ประปาภูเขา'].map(type=>`<td>${group.filter(x=>x.well_type===type).length}</td>`).join('')}<td>${group.length}</td><td>${group.filter(x=>x.sample_code).length}</td><td>${sum} คน (ระบุ ${known.length}/${group.length} แห่ง)</td></tr>`;}).join(''));
+ const screened=a.filter(x=>x.status_2q&&x.status_2q!=='ยังไม่คัดกรอง');
+ setHtml('chart-2q-overview',bars([['ยังไม่คัดกรอง',a.length-screened.length,'#64748b'],['มีผลบันทึก',screened.length,'#0284c7']],a.length));
+ setHtml('dash-2q-hc-body',`<tr><td>ไม่ระบุ</td><td>${a.length}</td><td>${screened.length}</td><td>${a.filter(x=>String(x.status_2q).includes('ปกติ')).length}</td><td>${a.filter(x=>String(x.status_2q).includes('Positive')).length}</td><td>${a.length-screened.length}</td></tr>`);
+}
+function renderScreeningDashboardAndTables() {
+ const a=yearRows(state.respondents),b=yearRows(state.envAs02,2);
+ setText('scr-as01-count',a.length);setText('scr-as02-count',b.length);
+ setText('scr-as02-risk-count-note',`กลุ่ม AS-02 ปี ${state.fiscalYear}: เสี่ยงต่ำ ${b.filter(r=>r.risk_level==='ต่ำ').length} | ปานกลาง ${b.filter(r=>r.risk_level==='ปานกลาง').length} | มาก ${b.filter(r=>r.risk_level==='มาก').length}`);
+ setHtml('scr-chart-as01-risk',riskBars(a));
+ setHtml('scr-chart-as01-questions','<p class="data-note">ข้อมูลสรุปเดิมไม่มีคำตอบรายข้อ สามารถเพิ่มรายละเอียดในแบบฟอร์มได้</p>');
+ setHtml('scr-chart-as02-summary',riskBars(b));
+ setHtml('scr-chart-2q-summary','<p class="data-note">แสดงผล 2Q ที่บันทึกในทะเบียนของปีงบประมาณที่เลือก</p>');
+ renderScreeningAs01Table();renderScreeningAs02Table();renderScreening2QTable();
+}
+function sourceStageRows(mode) {
+ return mode==='TARGET_90'||mode==='TARGET_130' ? yearRows(state.envAs02,2) : yearRows(state.respondents);
+}
+function sourceSearch(rows,q) { return rows.filter(r=>!q||[r.code,r.form_no,r.full_name,r.age,r.gender,r.cid,r.phone,r.tambon,r.moo,r.source_tab,r.health_center].join(' ').toLowerCase().includes(q.toLowerCase())); }
+function renderScreeningAs01Table() {
+ const mode=document.getElementById('scr-as01-tab')?.value||'ALL',risk=document.getElementById('scr-as01-risk')?.value||'ALL';
+ const rows=sourceSearch(sourceStageRows(mode),document.getElementById('scr-as01-search')?.value||'').filter(r=>risk==='ALL'||r.risk_level===risk);
+ setHtml('scr-as01-tbody',rows.map(r=>`<tr><td>${esc(r.code)}<br><small>${esc(r.source_tab)}</small></td><td>${esc(r.survey_date||'ไม่ระบุ')}</td><td>${esc(r.full_name)}</td><td>${esc(valueOrBlank(r.age)===''?'ไม่ระบุ':r.age)}</td><td>${esc(r.gender||'ไม่ระบุ')}</td><td>${esc(r.house_no||'')} ม.${esc(r.moo)} ต.${esc(r.tambon)}</td><td>${esc(r.health_center||'ไม่ระบุ')}</td><td>${esc(historyValuePresent(r.exposure_years)?r.exposure_years:'ไม่ระบุ')}</td><td>${esc(r.risk_job_type||'ไม่ระบุ')}</td><td>${esc(r.diseases||'ไม่ระบุ')}</td><td>${r.total_score??'ไม่ระบุ'}</td><td>${esc(r.risk_level)}</td><td>${esc(r.status_2q||'ยังไม่คัดกรอง')}</td><td><button class="btn btn-sm btn-primary" onclick="${mode==='TARGET_90'?'openEnvAs02Modal':'openRespondentModal'}('${esc(r.id)}')">แก้ไข</button></td></tr>`).join('')||'<tr><td colspan="14">ไม่พบข้อมูล</td></tr>');
+}
+function renderScreeningAs02Table() {
+ const rows=sourceSearch(yearRows(state.envAs02,2),document.getElementById('scr-as02-search')?.value||'');
+ setHtml('scr-as02-tbody',rows.map(r=>`<tr><td>${esc(r.code||r.form_no||r.id)}</td><td>${esc(r.interview_date||'ไม่ระบุ')}</td><td>${esc(r.full_name)}</td><td>${esc(valueOrBlank(r.age)===''?'ไม่ระบุ':r.age)}</td><td>${esc(r.gender||'ไม่ระบุ')}</td><td>${esc(valueOrBlank(r.weight_kg)===''?'ไม่ระบุ':r.weight_kg)}</td><td>${esc(valueOrBlank(r.height_cm)===''?'ไม่ระบุ':r.height_cm)}</td><td>${esc(r.phone||'ไม่ระบุ')}</td><td>ม.${esc(r.moo)} ต.${esc(r.tambon)}</td><td>${esc(historyValuePresent(r.exposure_years)?r.exposure_years:'ไม่ระบุ')}</td><td>${esc([r.herb_usage,r.smoking_status,r.alcohol_status].filter(Boolean).join(' / ')||'ไม่ระบุ')}</td><td>${esc(r.seafood_3days||'ไม่ระบุ')}</td><td>${esc(formatWaterSources(r,'drink')||'ไม่ระบุ')}</td><td>${esc(formatWaterSources(r,'use')||'ไม่ระบุ')}</td><td>คะแนน ${r.total_score??'ไม่ระบุ'} (${esc(r.risk_level||'ไม่ระบุ')})${r.respondent_id?'<br>เชื่อมกับ AS-01 แล้ว':''}</td><td>${r.history_complete?'บันทึกประวัติเพิ่มแล้ว':'มีรายชื่อ; รายละเอียดประวัติยังไม่บันทึก'}</td><td><button class="btn btn-sm btn-primary" onclick="openEnvAs02Modal('${esc(r.id)}')">แก้ไข/เชื่อมรายชื่อ</button></td></tr>`).join('')||'<tr><td colspan="17">ไม่พบข้อมูล</td></tr>');
+}
+function renderScreening2QTable() {
+ const mode=document.getElementById('scr-2q-tab')?.value||'ALL',status=document.getElementById('scr-2q-status')?.value||'ALL',q=document.getElementById('scr-2q-search')?.value||'';
+ const rows=sourceSearch(sourceStageRows(mode),q).filter(r=>status==='ALL'||r.status_2q===status||status==='POSITIVE'&&String(r.status_2q).includes('Positive')||status==='NEGATIVE'&&String(r.status_2q).includes('ปกติ')||status==='WAIT'&&r.status_2q==='ยังไม่คัดกรอง');
+ setHtml('scr-2q-tbody',rows.map(r=>`<tr><td>${esc(r.code)}<br>${esc(r.source_tab)}</td><td>${esc(r.full_name)}</td><td>${esc(r.age??'ไม่ระบุ')} / ${esc(r.gender||'ไม่ระบุ')}</td><td>ม.${esc(r.moo)} ต.${esc(r.tambon)}</td><td>${esc(r.risk_level)}</td><td>${esc(r.q2_1||'ยังไม่บันทึก')}</td><td>${esc(r.q2_2||'ยังไม่บันทึก')}</td><td>${esc(r.status_2q||'ยังไม่คัดกรอง')}</td><td>${esc(r.date_2q||'ไม่ระบุ')}</td><td><button class="btn btn-sm btn-primary" onclick="${mode==='TARGET_90'?'open2QModalForAs02':'open2QModal'}('${esc(r.id)}')">บันทึก 2Q</button></td></tr>`).join('')||'<tr><td colspan="10">ไม่พบข้อมูล</td></tr>');
+}
+function syncCoordinatesFromSelectedWell() {
+ // A water-use link does not establish a person's residence coordinate. Keep explicit GPS unchanged.
+}
+function open2QModalForAs02(id) {
+ const r=state.envAs02.find(x=>x.id===id);if(!r)return;
+ if(!r.respondent_id){alert('ยังไม่มีการยืนยันรายชื่อกับขั้นแรก กรุณาตรวจและเชื่อมรายชื่อก่อนบันทึกผล 2Q ร่วมกัน');showSourceEditor(id,2);return;}
+ open2QModal(r.respondent_id);
+}
+function export2QCsv() {
+ csvFile(`2Q_recorded_${state.fiscalYear}.csv`,['รหัส','ชื่อ','ข้อ 1','ข้อ 2','ผล 2Q','วันที่','ผู้ประเมิน'],yearRows(state.respondents).map(r=>[r.code,r.full_name,r.q2_1,r.q2_2,r.status_2q,r.date_2q,r.assessor_2q]));
+}
+function renderRespondentsTable() {
+ const rows=sourceSearch(sourceStageRows(document.getElementById('resp-filter-tab')?.value||'ALL'),document.getElementById('resp-search')?.value||'').filter(r=>{
+  const t=document.getElementById('resp-filter-tambon')?.value||'ALL',risk=document.getElementById('resp-filter-risk')?.value||'ALL',well=document.getElementById('resp-filter-well')?.value||'ALL',hc=document.getElementById('resp-filter-hc')?.value||'ALL';return (t==='ALL'||r.tambon===t)&&(risk==='ALL'||r.risk_level===risk||risk==='ปานกลาง-มาก'&&['ปานกลาง','มาก'].includes(r.risk_level))&&(well==='ALL'||r.well_id===well)&&(hc==='ALL'||r.health_center===hc);
+ });
+ setHtml('respondents-table-body',rows.map(r=>`<tr><td>${r.seq}</td><td>${esc(r.code)}</td><td>${esc(r.full_name)}</td><td class="registry-cid">${esc(r.cid||'ไม่ระบุ')}${historyValuePresent(r.cid)?'<br><button class="btn btn-sm btn-outline" onclick="copyRespondentCid(\''+esc(r.id)+'\')">คัดลอกเลขบัตร</button>':''}</td><td>${esc(valueOrBlank(r.age)===''?'ไม่ระบุ':r.age)}</td><td>${esc(r.gender||'ไม่ระบุ')}</td><td>${esc(formatBasicAddress(r))}</td><td title="${r.basic_profile_source?.health_center?'อ้างอิงตารางพื้นที่รับผิดชอบตามหมู่และตำบล':''}">${esc(r.health_center||'ไม่ระบุ')}</td><td>${esc(r.well_id||'ยังไม่เชื่อมบ่อ')}</td><td>${r.total_score??'ไม่ระบุ'}</td><td>${esc(r.risk_level)}</td><td>${esc(r.source_tab)}</td><td>${esc(r.status_2q||'ยังไม่คัดกรอง')}</td><td><button class="btn btn-sm btn-primary" onclick="${state.envAs02.some(a=>a.id===r.id)?'openEnvAs02Modal':'openRespondentModal'}('${esc(r.id)}')">แก้ไข</button></td></tr>`).join('')||'<tr><td colspan="14">ไม่พบข้อมูล</td></tr>');
+}
+function renderPivotSummary() {
+ const a=yearRows(state.respondents),b=yearRows(state.envAs02,2);
+ setHtml('pivot-summary-body',[[`ประเมินแม่อาย ${state.fiscalYear} (AS-01)`,a],[`เก็บแม่อาย ${state.fiscalYear} (AS-02)`,b]].map(([name,rows])=>`<tr><td>${esc(name)}</td><td>${rows.filter(x=>x.tambon==='ท่าตอน').length}</td><td>${rows.filter(x=>x.tambon==='แม่นาวาง').length}</td><td>${rows.length}</td></tr>`).join(''));
+ const groups=new Map();for(const r of a){const key=r.tambon+'|'+r.moo;const group=groups.get(key)||{tambon:r.tambon,moo:r.moo,count:0};group.count++;groups.set(key,group);}
+ const rows=[...groups.values()].sort((x,y)=>String(x.tambon).localeCompare(String(y.tambon),'th')||Number(x.moo)-Number(y.moo));
+ setHtml('village-screening-summary-body',rows.map(r=>`<tr><td>${esc(r.tambon)}</td><td>${esc(r.moo)}</td><td>${r.count}</td></tr>`).join('')+`<tr><th colspan="2">รวมประเมินแม่อาย ${state.fiscalYear}</th><th>${a.length}</th></tr>`);
+}
+function showSourceEditor(id,stage) {
+ const rows=stage===2?state.envAs02:state.respondents,r=rows.find(x=>x.id===id);if(!r)return;
+ let modal=document.getElementById('source-record-modal');if(!modal){modal=document.createElement('div');modal.id='source-record-modal';modal.className='modal-backdrop';document.body.appendChild(modal);}
+ modal.style.display='flex';modal.innerHTML=`<div class="modal-dialog"><div class="modal-header"><h3>แก้ไขทะเบียนขั้น ${stage}: ${esc(r.code)}</h3><button type="button" class="btn-close" onclick="document.getElementById('source-record-modal').style.display='none'">×</button></div><form onsubmit="saveSourceEditor(event,'${esc(id)}',${stage})"><div class="modal-body"><p class="data-note">ค่าตามชีท ${esc(r.source_tab)} แถว ${r.source?.row||'-'}; ชื่อซ้ำข้ามขั้นตอนเป็นการติดตาม ไม่ลบรายการอัตโนมัติ</p><div class="form-group"><label>ชื่อ–นามสกุล</label><input id="source-edit-name" required value="${esc(r.full_name)}"></div><div class="form-grid-2"><div class="form-group"><label>หมู่</label><input id="source-edit-moo" type="number" value="${esc(r.moo)}"></div><div class="form-group"><label>ตำบล</label><input id="source-edit-tambon" value="${esc(r.tambon)}"></div><div class="form-group"><label>คะแนนรวมตามต้นฉบับ</label><input id="source-edit-score" type="number" step="any" value="${esc(r.total_score)}"></div><div class="form-group"><label>ระดับความเสี่ยงตามต้นฉบับ</label><select id="source-edit-risk">${['ต่ำ','ปานกลาง','มาก','ไม่ระบุ'].map(v=>`<option ${v===r.risk_level?'selected':''}>${v}</option>`).join('')}</select></div></div>${stage===2?`<div class="form-group"><label>ยืนยันการเชื่อมกับผลคัดกรองขั้นแรก (ตรวจบุคคลก่อนเลือก)</label><select id="source-edit-link"><option value="">ยังไม่ยืนยันการจับคู่</option>${state.respondents.map(a=>`<option value="${esc(a.id)}" ${r.respondent_id===a.id?'selected':''}>${esc(a.code+' '+a.full_name+' ม.'+a.moo+' ต.'+a.tambon)}${r.candidate_respondent_ids?.includes(a.id)?' — ชื่อ/พื้นที่ตรงกัน':''}</option>`).join('')}</select></div><p>คะแนนของสองขั้นตอนเก็บแยกกัน ไม่เขียนทับกัน</p>`:''}</div><div class="modal-footer"><button class="btn btn-primary" type="submit">บันทึก</button>${stage===2?`<button class="btn btn-outline" type="button" onclick="document.getElementById('source-record-modal').style.display='none';openDetailedEnvAs02('${esc(id)}')">เพิ่ม/แก้รายละเอียดซักประวัติ</button>`:''}</div></form></div>`;
+}
+function saveSourceEditor(e,id,stage) {
+ e.preventDefault();const rows=stage===2?state.envAs02:state.respondents,r=rows.find(x=>x.id===id);if(!r)return;
+ r.full_name=document.getElementById('source-edit-name').value.trim();r.moo=optionalNumber(document.getElementById('source-edit-moo').value);r.tambon=document.getElementById('source-edit-tambon').value.trim();r.total_score=optionalNumber(document.getElementById('source-edit-score').value);r.risk_level=document.getElementById('source-edit-risk').value;
+ if(stage===2){r.respondent_id=document.getElementById('source-edit-link').value;r.link_status=r.respondent_id?'ผู้ใช้ยืนยันการจับคู่':'ยังไม่ยืนยันการจับคู่';}
+ r.updated_at=new Date().toISOString();saveLocalData();document.getElementById('source-record-modal').style.display='none';
+}
+function parseReportedValue(raw) {
+ const s=String(raw??'').trim();if(!s)return {type:'missing'};
+ if(/^(ND|Not\s*Detected|ไม่พบ.*)$/i.test(s))return {type:'nd'};
+ const m=s.match(/^(<=|>=|<|>|≤|≥)?\s*(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)$/i);if(!m)return {type:'invalid'};
+ return {type:m[1]?'bound':'number',op:m[1]||'=',value:Number(m[2])};
+}
+function checkSingleParam(paramDef,rawVal,stdType) {
+ const v=parseReportedValue(rawVal);if(v.type==='missing')return {status:'NA',label:'ไม่มีผลตรวจ'};
+ if(v.type==='nd')return {status:'UNKNOWN',label:'ไม่พบตามรายงาน; ไม่ระบุขีดจำกัดการตรวจ'};
+ if(v.type==='invalid')return {status:'UNKNOWN',label:'รูปแบบผลตรวจรอตรวจสอบ'};
+ const threshold=stdType==='SOURCE_SSO'?({as_val:0.01,cd:0.003,pb:0.01,hg:0.001}[paramDef?.key]):paramDef?.[stdType||'DOH_2543'];
+ if(threshold===null||threshold===undefined)return {status:'UNKNOWN',label:'ไม่มีเกณฑ์เปรียบเทียบในชุดนี้'};
+ let status='UNKNOWN';
+ if(Array.isArray(threshold)){if(v.type==='number')status=v.value>=threshold[0]&&v.value<=threshold[1]?'PASS':'FAIL';}
+ else if(v.type==='number')status=v.value<=threshold?'PASS':'FAIL';
+ else if(['<','<=','≤'].includes(v.op)&&v.value<=threshold)status='PASS';
+ else if((v.op==='>'&&v.value>=threshold)||(['>=','≥'].includes(v.op)&&v.value>threshold))status='FAIL';
+ return {status,label:status==='PASS'?'ไม่เกินเกณฑ์ที่เลือก':status==='FAIL'?'เกินเกณฑ์ที่เลือก':'ยังประเมินไม่ได้จากขอบเขตที่รายงาน'};
+}
+function evaluateWaterLabRecord(rec) {
+ let testedCount=0,unknownCount=0,passCount=0;const failedNames=[];
+ WATER_LAB_PARAMS.forEach(p=>{const out=checkSingleParam(p,rec[p.key],rec.standard_type||'DOH_2543');if(out.status!=='NA')testedCount++;if(out.status==='UNKNOWN')unknownCount++;if(out.status==='PASS')passCount++;if(out.status==='FAIL')failedNames.push(p.name);});
+ const overallStatus=failedNames.length?'เกินเกณฑ์มาตรฐาน':testedCount===0?'ไม่มีผลตรวจ':unknownCount?'ยังสรุปไม่ได้ (มีผล ND/ข้อมูลไม่ครบ)':'ไม่เกินเกณฑ์เฉพาะรายการที่ประเมินได้';
+ return {testedCount,unknownCount,passCount,failedNames,overallStatus};
+}
+function buildWaterLabParamsInputs(existingRecord=null) {
+ const std=document.getElementById('wlab-standard-type')?.value||'SOURCE_SSO';
+ setHtml('wlab-params-tbody',WATER_LAB_PARAMS.map(p=>`<tr${p.secId?' id="'+p.secId+'"':''}><td>${p.seq}</td><td>${esc(p.name)}</td><td>${std==='SOURCE_SSO'&&['as_val','cd','pb','hg'].includes(p.key)?'mg/kg (หน่วยตามชีทผลตรวจ)':esc(p.unit)}</td><td>${esc(p.whoLabel)}</td><td>${esc(p.ruralLabel)}</td><td>${esc(p.dohLabel)}</td><td>${std==='SOURCE_SSO'?esc({as_val:'0.01',cd:'0.003',pb:'0.01',hg:'0.001'}[p.key]??'ไม่มีเกณฑ์ในชีทผลตรวจ'):esc(Array.isArray(p[std])?p[std].join('–'):p[std]??'ไม่ระบุ')}</td><td><input type="text" class="lab-param-input" id="wlab-inp-${p.key}" value="${esc(existingRecord?.[p.key]??'')}" placeholder="เช่น ND, Not Detected, &lt;0.005, 0.001" oninput="evaluateAllWaterLabInputs()"></td><td id="wlab-badge-${p.key}"></td></tr>`).join(''));
+ evaluateAllWaterLabInputs();
+}
+function rebuildWaterLabParams() {
+ const values=Object.fromEntries(WATER_LAB_PARAMS.map(p=>[p.key,document.getElementById('wlab-inp-'+p.key)?.value||'']));
+ buildWaterLabParamsInputs(values);
+}
+function evaluateAllWaterLabInputs() {
+ const rec={standard_type:document.getElementById('wlab-standard-type')?.value||'SOURCE_SSO'};
+ WATER_LAB_PARAMS.forEach(p=>{const inp=document.getElementById('wlab-inp-'+p.key);if(!inp)return;rec[p.key]=inp.value;const result=checkSingleParam(p,inp.value,rec.standard_type);setText('wlab-badge-'+p.key,result.label);});
+ const e=evaluateWaterLabRecord(rec);setText('wlab-live-summary',`มีผล ${e.testedCount}/21 รายการ | เกินเกณฑ์ ${e.failedNames.length} | ยังประเมินไม่ได้ ${e.unknownCount}`);setText('wlab-live-badge',e.overallStatus);
+}
+function saveLocalData() {
+ // Clinical and location records stay in authenticated session memory, never browser storage.
+ fillAvailableAS02History();refreshAllViews();
+}
+async function deleteWell(id) {
+ const count=state.waterLabs.filter(r=>r.well_id===id).length;
+ if(!confirm(`ลบทะเบียน ${id}? ผลตรวจที่เชื่อม ${count} รายการจะยังอยู่และเปลี่ยนเป็นรอจับคู่`))return;
+ state.wells=state.wells.filter(w=>w.well_id!==id);
+ state.waterLabs.forEach(r=>{if(r.well_id===id){r.well_id='';r.match_status='ทะเบียนบ่อถูกลบ รอจับคู่ใหม่';}});
+ state.respondents.forEach(r=>{if(r.well_id===id)r.well_id='';});state.envAs02.forEach(r=>{if(r.well_id===id)r.well_id='';});saveLocalData();
+ postToGoogleSheets({action:'deleteWell',well_id:id});
+}
+async function deleteRespondent(id) {
+ if(!confirm('ลบรายการขั้นแรกนี้? ผลติดตามขั้นสองจะยังอยู่และยกเลิกเฉพาะลิงก์ที่ยืนยันไว้'))return;
+ state.respondents=state.respondents.filter(r=>r.id!==id);state.envAs02.forEach(r=>{if(r.respondent_id===id){r.respondent_id='';r.as01_auto_link_disabled=true;r.link_status='รายการขั้นแรกถูกลบ รอจับคู่ใหม่';}});saveLocalData();
+}
+function renderWaterLabDashboardAndTable() {
+ refreshWaterLabYearOptions();
+ const labs=waterLabYearRows();labs.forEach(r=>{const e=evaluateWaterLabRecord(r);r.overall_status=e.overallStatus;r.failed_params=e.failedNames.join(', ');});
+ const statuses=[...new Set(labs.map(r=>r.overall_status))];
+ setHtml('chart-waterlab-status',bars(statuses.map(s=>[s,labs.filter(r=>r.overall_status===s).length,s==='เกินเกณฑ์มาตรฐาน'?'#dc2626':'#64748b']),labs.length));
+ const rounds=[...new Set(labs.map(r=>r.sample_date))].sort();
+ setHtml('chart-waterlab-params',bars(rounds.map(d=>[d+' (รอบตรวจ)',labs.filter(r=>r.sample_date===d).length]),labs.length)+`<p class="data-note">${labs.length} ตัวอย่างใน ${rounds.length} รอบ ไม่ใช่จำนวนบ่อไม่ซ้ำ; จับคู่ทะเบียนได้ ${labs.filter(r=>r.well_id).length} ตัวอย่าง / รอตรวจสอบ ${labs.filter(r=>!r.well_id).length} ตัวอย่าง<br>เทียบเกณฑ์ตามชีทต้นฉบับ หน่วย mg/kg; ไม่ใช่การรับรองน้ำดื่ม</p>`);
+ renderWaterLabTable();
+}
+function renderWaterLabParamCell(record,param) {
+ const value=record[param.key];
+ if(value===null||value===undefined||value==='')return `<td data-param-key="${esc(param.key)}" data-result-status="NA" title="ยังไม่มีผลบันทึก">—</td>`;
+ const result=checkSingleParam(param,value,record.standard_type||'DOH_2543');
+ const abnormal=result.status==='FAIL';
+ const unit=record.standard_type==='SOURCE_SSO'&&['as_val','cd','pb','hg'].includes(param.key)?record.source_unit||'หน่วยตามต้นฉบับ':param.unit;
+ return `<td data-param-key="${esc(param.key)}" data-result-status="${result.status}" class="${abnormal?'lab-result-abnormal':''}" title="${esc(result.label)}">${esc(value)}${unit&&unit!=='-'?'<br><small>'+esc(unit)+'</small>':''}</td>`;
+}
+function renderWaterLabTable() {
+ const q=document.getElementById('waterlab-search')?.value||'',well=document.getElementById('waterlab-filter-well')?.value||'ALL',result=document.getElementById('waterlab-filter-result')?.value||'ALL',std=document.getElementById('waterlab-filter-std')?.value||'ALL';
+ const rows=sortedWaterLabs(waterLabYearRows()).filter(r=>(well==='ALL'||well==='UNMATCHED'&&!r.well_id||r.well_id===well)&&(result==='ALL'||r.overall_status===result)&&(std==='ALL'||r.standard_type===std)&&(!q||[r.point_name,r.source_point_code,r.source_point_label,r.source_village_name,r.sample_date,r.source_date,r.sample_code,r.well_id,r.notes].join(' ').toLowerCase().includes(q.toLowerCase())));
+ const header=document.getElementById('waterlab-table-head');
+ if(header)header.innerHTML='<th>รหัสรายการ / จุดตามต้นฉบับ</th><th>วันที่เก็บ/ส่งตรวจ</th><th>ปีงบประมาณ</th><th>ชื่อจุดเก็บ / จุดแหล่งน้ำที่เชื่อม</th><th>หมู่ที่ / ตำบล</th>'+WATER_LAB_PARAMS.map(p=>`<th data-param-key="${esc(p.key)}">${esc(p.name.replace(' ⭐',''))}</th>`).join('')+'<th>จำนวนค่าตรวจ / แหล่งที่มา</th><th>สรุปเฉพาะรายการที่มีข้อมูล</th><th>จัดการ</th>';
+ setHtml('waterlab-table-body',rows.map(r=>{
+  const w=state.wells.find(w=>w.well_id===r.well_id),e=evaluateWaterLabRecord(r);
+  const loc=waterLabArea(r),area=[historyValuePresent(loc.moo)?'ม.'+esc(loc.moo):'',loc.tambon?'ต.'+esc(loc.tambon):''].filter(Boolean).join(' ')||'ตามชื่อจุดเก็บต้นฉบับ';
+  return `<tr><td>${esc(r.sample_code)}${r.source_point_code?'<br><b>จุด '+esc(r.source_point_code)+'</b>':''}</td><td>${esc(formatSampleDate(r.sample_date))}${r.source_date?'<br><small>วันที่ส่งตรวจตามต้นฉบับ '+esc(r.source_date)+'</small>':''}</td><td>${recordFiscalYear(r,'water')||'ไม่ระบุ'}</td><td class="waterlab-point-name">${esc(r.point_name||w?.well_name||'ไม่ระบุ')}<br><b>${esc(r.well_id||'ยังไม่เชื่อมทะเบียน')}</b></td><td>${area}</td>${WATER_LAB_PARAMS.map(p=>renderWaterLabParamCell(r,p)).join('')}<td>${e.testedCount} รายการ<br><small>${esc(r.source?.sheet||'บันทึกเพิ่มเติม')} แถว ${r.source?.row||'-'}</small></td><td class="${e.failedNames.length?'lab-result-abnormal':''}">${esc(e.overallStatus)}<br><small>Not Detected คงตามใบผลตรวจ</small></td><td><button class="btn btn-sm btn-primary" onclick="openWaterLabModal('${esc(r.id)}')">แก้ไข</button> <button class="btn btn-sm btn-danger" onclick="deleteWaterLab('${esc(r.id)}')">ลบ</button></td></tr>`;
+ }).join('')||`<tr><td colspan="${WATER_LAB_PARAMS.length+8}">ไม่พบข้อมูล</td></tr>`);
+}
+function csvFile(filename,headers,rows) {
+ const cell=v=>'"'+String(v??'').replace(/"/g,'""')+'"';downloadCsvFile(filename,[headers,...rows].map(r=>r.map(cell).join(',')).join('\r\n'));
+}
+function exportRespondentsCsv() {
+ csvFile(`Env_As_01_${state.fiscalYear}.csv`,IMPORT_SCHEMAS.as01.fields.map(f=>f.key),yearRows(state.respondents).map(r=>exportTemplateRecord('as01',r)));
+}
+function exportEnvAs02Csv() {
+ csvFile(`Env_As_02_${state.fiscalYear}.csv`,IMPORT_SCHEMAS.as02.fields.map(f=>f.key),yearRows(state.envAs02,2).map(r=>exportTemplateRecord('as02',r)));
+}
+function exportWellsCsv() {
+ csvFile('water_wells_source_2569.csv',['รหัสบ่อ','ลำดับ','รหัสตัวอย่างตามทะเบียน','ชื่อ','บ้านเลขที่','บ้านเลขที่ดิบในต้นฉบับ','หมู่','ตำบล','ประเภท','UTM E','UTM N','Latitude','Longitude','สมมติฐานพิกัด','ระยะจากแม่น้ำ','จำนวนผู้ใช้ที่ระบุ','รพ.สต.','ข้อควรตรวจสอบ'],state.wells.map(w=>[w.well_id,w.seq,w.sample_code,w.owner_name,w.house_no,w.house_no_source,w.moo,w.tambon,w.well_type,w.utm_e,w.utm_n,w.latitude,w.longitude,w.coordinate_basis,w.distance_river_m,w.user_count,w.health_center,w.notes]));
+}
+function exportWaterLabCsv() {
+ const headers=['รหัสตัวอย่างระบบ','ปีงบประมาณ','วันที่เก็บ/ส่งตรวจ','วันที่ตามต้นฉบับ','ชื่อจุดเก็บ','รหัสจุดตามต้นฉบับ','ชื่อจุดตามต้นฉบับ','รหัสแหล่งน้ำที่เชื่อม','หน่วยตามชีทต้นฉบับ',...WATER_LAB_PARAMS.map(p=>p.name.replace(' ⭐','')),'สรุปเฉพาะข้อมูลที่มี','แหล่งที่มา','แถว','หมายเหตุ'];
+ csvFile(`community_water_labs_SSO_${state.waterLabYear||'ALL'}.csv`,headers,sortedWaterLabs(waterLabYearRows()).map(r=>[r.sample_code,recordFiscalYear(r,'water'),r.sample_date,r.source_date,r.point_name,r.source_point_code,r.source_point_label,r.well_id,r.source_unit,...WATER_LAB_PARAMS.map(p=>r[p.key]),evaluateWaterLabRecord(r).overallStatus,r.source?.sheet,r.source?.row,r.notes]));
+}
+function downloadFullBackupJson() {
+ if(!state.cloudToken||!state.dataLoaded){alert('กรุณาเข้าสู่ระบบส่วนกลางก่อน');return;}
+ downloadCsvFile('maeai_backup_'+bangkokToday()+'.json',JSON.stringify({data_version:DATA_VERSION,exported_at:new Date().toISOString(),wells:state.wells,respondents:state.respondents,envAs02:state.envAs02,waterLabs:state.waterLabs,knowledgeDocs:state.knowledgeDocs,pendingWrites:pendingCloudWrites()},null,2));
+}
+function resetToSeedData() {
+ return pullFromGoogleSheets();
+}
+// Central-only online release. Tokens and unsent records live only in this session.
+function pendingCloudWrites(){return state.pendingWrites||[];}
+function storePendingCloudWrites(rows){state.pendingWrites=rows;updatePendingNotice();}
+function updatePendingNotice(){
+ const notice=document.getElementById('pending-cloud-notice'),count=pendingCloudWrites().length;
+ if(notice)notice.hidden=!count||!state.currentUser;
+ setText('pending-cloud-message','Google Sheets ยังไม่ยืนยัน '+count+' รายการ กรุณาส่งให้สำเร็จก่อนปิดหน้าเว็บ');
+}
+async function cloudRequest(payload=null,action='capabilities'){
+ if(!validGasUrl(state.gasUrl))throw Error('กรุณาตั้งค่าลิงก์ Google Apps Script /exec');
+ if(action==='getAll'&&!payload)payload={action:'getAll'};
+ const controller=new AbortController(),epoch=state.sessionEpoch;
+ if(!state.activeCloudRequests)state.activeCloudRequests=new Set();
+ state.activeCloudRequests.add(controller);
+ const timeout=setTimeout(()=>controller.abort(),25000);
+ try{
+  let url=state.gasUrl,options={signal:controller.signal,credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'};
+  if(payload){options.method='POST';options.headers={'Content-Type':'text/plain;charset=utf-8'};options.body=JSON.stringify({...payload,data_version:DATA_VERSION,token:payload.token??state.cloudToken??''});}
+  else{const u=new URL(url);u.searchParams.set('action',action);url=u.toString();}
+  const response=await fetch(url,options);if(!response.ok)throw Error('HTTP '+response.status);
+  const data=await response.json();
+  if(epoch!==state.sessionEpoch){const e=Error('ยกเลิกคำขอจากการเข้าสู่ระบบครั้งก่อน');e.code='STALE_SESSION';throw e;}
+  if(data.status!=='success'){const e=Error(data.message||'ส่วนกลางยังไม่ยืนยันการบันทึก');e.code=data.code;throw e;}
+  return data;
+ }finally{clearTimeout(timeout);state.activeCloudRequests.delete(controller);}
+}
+async function saveLoginGasUrl(){
+ if(state.loginBusy)return;
+ try{persistGasUrlEverywhere(document.getElementById('login-gas-url').value);state.cloudCapabilities=null;setLoginMessage('');await probeCloudConnection();}
+ catch(e){setLoginMessage(e.message);}
+}
+async function probeCloudConnection(){
+ try{
+  const data=await cloudRequest();
+  if(data.data_version!==DATA_VERSION||data.requires_auth!==true||data.api_revision!==ONLINE_API_REVISION||data.supports_post_get_all!==true)throw Error('กรุณาอัปเดต Apps Script จากชุดออนไลน์ และ Deploy รายการเดิมเป็น New version ก่อน');
+  state.cloudCapabilities=data;state.connectionError='';
+  setText('login-connection-status',data.initialized?'ส่วนกลางพร้อมใช้งาน กรุณาเข้าสู่ระบบ':'พบตัวเชื่อม แต่ฐานกลางยังไม่เริ่มต้น กรุณาตรวจฐานเดิมกับผู้ดูแลระบบ');
+  return data;
+ }catch(e){
+  state.cloudCapabilities=null;state.connectionError=e.message;state.cloudVerified=false;
+  setText('login-connection-status','ส่วนกลางยังไม่พร้อม: '+e.message);logCloudMessage(e.message);return null;
+ }
+}
+async function loginToCentral(username,password){
+ try{
+  const data=await cloudRequest({action:'login',username,password});
+  if(data.data_version!==DATA_VERSION||!data.token||!data.user?.username)throw Error('ผลตอบกลับการเข้าสู่ระบบไม่ครบ');
+  state.cloudToken=data.token;state.currentUser=data.user;state.cloudCapabilities.initialized=data.initialized;
+  if(!data.initialized)throw Error('ยังไม่มีฐานกลางที่พร้อมใช้งาน กรุณาตรวจชีท V2 เดิมกับผู้ดูแลระบบ ฉบับออนไลน์ไม่สร้างฐานจากข้อมูลว่าง');
+  await readCentralData();
+  setLoginMessage('');enterApplication();
+ }catch(e){
+  const token=state.cloudToken;clearSessionData();
+  if(token)cloudRequest({action:'logout',token}).catch(()=>{});
+  throw e;
+ }
+}
+async function readCentralData(){
+ const data=await cloudRequest({action:'getAll'});
+ if(data.data_version!==DATA_VERSION||!data.initialized)throw Error('ฐานกลางยังไม่พร้อม หรือรุ่นข้อมูลไม่ตรงกัน');
+ if(!['wells','respondents','envAs02','waterLabs','knowledgeDocs'].every(k=>Array.isArray(data[k])))throw Error('ข้อมูลส่วนกลางไม่ครบชุด');
+ const wells=data.wells.map((r,i)=>normalizeWellRecord(r,i));
+ const respondents=data.respondents.map((r,i)=>normalizeStageRecord({...r,seq:r.seq??i+1},1));
+ const envAs02=data.envAs02.map(r=>normalizeStageRecord(r,2));
+ state.wells=wells;state.respondents=respondents;state.envAs02=envAs02;
+ state.waterLabs=mergeCloudWaterLabHistory(data.waterLabs);state.knowledgeDocs=data.knowledgeDocs;
+ // Built-in documents contain blank forms/manuals only, never person records.
+ for(const builtin of INITIAL_KNOWLEDGE_DOCS){const doc=state.knowledgeDocs.find(d=>d.id===builtin.id);if(doc)Object.assign(doc,{file_url:builtin.file_url,author:builtin.author,is_builtin:true});else state.knowledgeDocs.push({...builtin});}
+ state.dataLoaded=true;state.cloudVerified=true;saveLocalData();updateSyncBadge();
+ logCloudMessage('อ่านข้อมูลล่าสุดจาก Google Sheets สำเร็จ');return true;
+}
+function expireCentralSession(error){
+ const count=pendingCloudWrites().length;clearSessionData();
+ setLoginMessage(error.message+(count?' มี '+count+' รายการที่ยังไม่ยืนยันการบันทึก กรุณาตรวจสอบกับฐานกลางหลังเข้าสู่ระบบใหม่':''));
+}
+function flushPendingCloudWrites(){
+ if(state.cloudFlushPromise)return state.cloudFlushPromise;
+ if(!state.cloudToken||!state.currentUser||!state.dataLoaded)return Promise.resolve(false);
+ const epoch=state.sessionEpoch;
+ const promise=(async()=>{
+  while(pendingCloudWrites().length){
+   const first=pendingCloudWrites()[0];
+   try{
+    await cloudRequest(first);
+    if(epoch!==state.sessionEpoch)return false;
+    storePendingCloudWrites(pendingCloudWrites().filter(r=>r._queue_id!==first._queue_id));
+   }catch(e){
+    if(epoch!==state.sessionEpoch)return false;
+    state.cloudVerified=false;
+    if(e.code==='AUTH_REQUIRED')expireCentralSession(e);
+    else{updateSyncBadge();logCloudMessage('ยังไม่บันทึกส่วนกลาง: '+e.message);}
+    return false;
+   }
+  }
+  state.cloudVerified=true;updateSyncBadge();return true;
+ })();
+ state.cloudFlushPromise=promise;
+ promise.finally(()=>{if(state.cloudFlushPromise===promise)state.cloudFlushPromise=null;});
+ return promise;
+}
+async function postToGoogleSheets(payload){
+ if(!state.cloudToken||!state.currentUser||!state.dataLoaded){alert('กรุณาเข้าสู่ระบบส่วนกลางและโหลดข้อมูลให้สำเร็จก่อนบันทึก');return false;}
+ const epoch=state.sessionEpoch;
+ const rows=pendingCloudWrites();rows.push(JSON.parse(JSON.stringify({...payload,_queue_id:Date.now()+'-'+Math.random().toString(36).slice(2)})));storePendingCloudWrites(rows);
+ const ok=await flushPendingCloudWrites();
+ if(!ok&&epoch===state.sessionEpoch&&state.currentUser)alert('Google Sheets ยังไม่ยืนยันการบันทึก มี '+pendingCloudWrites().length+' รายการรอส่ง กรุณากดส่งรายการรอส่งก่อนปิดหน้าเว็บ');
+ return ok;
+}
+async function pullFromGoogleSheets(silent=false){
+ if(!state.cloudToken||!state.currentUser){if(!silent)alert('กรุณาเข้าสู่ระบบส่วนกลางก่อน');return false;}
+ if(pendingCloudWrites().length&&!await flushPendingCloudWrites())return false;
+ try{return await readCentralData();}
+ catch(e){
+  if(e.code==='AUTH_REQUIRED')expireCentralSession(e);
+  else if(e.code!=='STALE_SESSION'){state.cloudVerified=false;updateSyncBadge();logCloudMessage('อ่านส่วนกลางไม่สำเร็จ: '+e.message);if(!silent)alert(e.message);}
+  return false;
+ }
+}
+async function syncAllToGoogleSheets(){
+ if(!state.cloudToken||!state.dataLoaded){alert('กรุณาเข้าสู่ระบบส่วนกลางก่อน');return false;}
+ const ok=await flushPendingCloudWrites()&&await pullFromGoogleSheets(true);
+ if(ok)alert('Google Sheets ยืนยันรายการที่ส่งและอ่านข้อมูลล่าสุดกลับสำเร็จ');
+ else if(state.currentUser)alert('ยังส่งหรืออ่านข้อมูลกลับไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตและสถานะรอส่ง');
+ return Boolean(ok);
+}
+function copyAppsScriptCode(){alert('ใช้ไฟล์ apps-script/google-apps-script.gs ในชุดออนไลน์ วางแทนโค้ดเดิม แล้ว Deploy > Manage deployments > Edit > New version โดยใช้ลิงก์เดิม ไม่ต้องเริ่มต้นฐานกลางใหม่');}
+window.addEventListener('DOMContentLoaded',()=>{state.cloudProbe=probeCloudConnection().finally(()=>state.cloudProbeComplete=true);});
+window.addEventListener('beforeunload',e=>{if(pendingCloudWrites().length){e.preventDefault();e.returnValue='';}});
+
+
+function openRespondentModal(id=null) {
+ const r=state.respondents.find(x=>x.id===id);
+ if(r?.source_summary_only){showSourceEditor(id,1);return;}
+ openDetailedRespondentModal(id);
+}
+function openEnvAs02Modal(id=null) {
+ if(id&&state.envAs02.find(x=>x.id===id)?.source_summary_only){showSourceEditor(id,2);return;}
+ openDetailedEnvAs02(id);
+}
+function filterRespondentsByTab(mode) {
+ switchTab('tab-respondents');const sel=document.getElementById('resp-filter-tab');if(sel)sel.value=mode;renderRespondentsTable();
+}
+window.addEventListener('DOMContentLoaded',()=>{
+ document.querySelectorAll('#env-as02-form select,#well-hc,#wlab-lab-select').forEach(select=>{if(!Array.from(select.options).some(x=>x.value===''))select.insertAdjacentHTML('afterbegin','<option value="">-- ยังไม่ระบุ --</option>');});
+ const warn=document.getElementById('data-quality-details');
+ if(warn)warn.textContent='ฉบับออนไลน์อ่านข้อมูลจาก Google Sheets หลังเข้าสู่ระบบเท่านั้น แยกข้อมูลคัดกรองตามวันที่บริการ/ปีงบประมาณ พิกัดและผลตรวจแสดงตามข้อมูลที่บันทึกในฐานกลาง';
+});
+
+
+// Carry forward available history for the same person; each assessment keeps its own results.
+const AS01_HISTORY_FIELDS = [
+ 'full_name','age','gender','cid','phone','house_no','moo','tambon','amphoe','province','health_center',
+ 'marital_status','education','years_in_area','exposure_years','risk_job_flag','risk_job_type',
+ 'job_detail','job_duration','job_hours','disease_flag','diseases','weight_kg','height_cm',
+ 'herb_usage','herb_name','herb_fda','smoking_status','smoking_type','smoking_per_day','smoking_years',
+ 'smoking_quit_years','alcohol_status','alcohol_other','seafood_freq','seafood_3days',
+ 'drink_sources','drink_years','use_sources','use_years','food_rice','food_veg','food_fish',
+ 'food_snail','home_grown_veg','home_grown_water','eat_river_veg_weekly','flood_5years'
+];
+function historyValuePresent(value) {
+ return value!==null && value!==undefined && !['','ไม่ระบุ','ยังไม่ระบุ'].includes(String(value).trim());
+}
+function historyNameKey(value) {
+ return String(value||'').normalize('NFC').trim()
+  .replace(/^(นางสาว|นาย|นาง|เด็กชาย|เด็กหญิง|ด\.?ช\.?|ด\.?ญ\.?)\s*/, '')
+  .replace(/\s+/g,'').toLowerCase();
+}
+function historyAreaKey(value) {return String(value??'').normalize('NFC').replace(/\s+/g,'');}
+function findAS01HistorySource(record) {
+ if(record.respondent_id)return state.respondents.find(r=>r.id===record.respondent_id)||null;
+ if(record.as01_auto_link_disabled)return null;
+ const key=historyNameKey(record.full_name);if(!key)return null;
+ const matches=state.respondents.filter(r=>historyNameKey(r.full_name)===key &&
+  (!recordFiscalYear(record,2)||!recordFiscalYear(r,1)||recordFiscalYear(record,2)===recordFiscalYear(r,1)) &&
+  ['moo','tambon'].every(field=>!historyValuePresent(record[field])||!historyValuePresent(r[field])||historyAreaKey(record[field])===historyAreaKey(r[field])));
+ return matches.length===1?matches[0]:null;
+}
+function fillAS02HistoryFromAS01(record) {
+ const source=findAS01HistorySource(record);if(!source)return [];
+ if(!record.respondent_id){record.respondent_id=source.id;record.link_status='เชื่อมกับ AS-01 ตามชื่อและพื้นที่';record.as01_link_basis='unique_name_with_consistent_area_and_year';}
+ const copied=[];
+ for(const field of AS01_HISTORY_FIELDS){
+  if(record.as01_prefill_exclusions?.[field]||historyValuePresent(record[field])||!historyValuePresent(source[field]))continue;
+  record[field]=source[field];
+  record.as01_prefill={...(record.as01_prefill||{}),[field]:{source_record_id:source.id,source_field:field,copied_at:new Date().toISOString(),value:source[field]}};
+  copied.push(field);
+ }
+ return copied;
+}
+function fillAvailableAS02History() {
+ for(const record of state.envAs02||[])fillAS02HistoryFromAS01(record);
+}
+
+// Pending review: full editable form data; uploaded source provenance remains intact.
+const REVIEW_COMMON_FIELDS = [
+ ['fiscal_year','ปีงบประมาณ (คำนวณจากวันที่ หากไม่ทราบวันที่ให้ระบุปี)','number'],['code','รหัสแบบ / Lab Code'],['full_name','ชื่อ–นามสกุล'],['age','อายุ (ปี)','number'],['gender','เพศ'],['cid','เลขประจำตัวประชาชน'],['phone','โทรศัพท์'],['house_no','บ้านเลขที่'],['moo','หมู่ที่','number'],['tambon','ตำบล'],['amphoe','อำเภอ'],['province','จังหวัด'],['health_center','รพ.สต. ที่รับผิดชอบ'],['well_id','ทะเบียนแหล่งน้ำที่ยืนยัน','well'],['latitude','ละติจูดที่วัดจริง','number'],['longitude','ลองจิจูดที่วัดจริง','number'],['marital_status','สถานภาพสมรส'],['education','การศึกษา'],['years_in_area','ระยะเวลาอาศัย (ปี)','number'],['exposure_years','ระยะเวลาสัมผัส (ปี)','number'],['risk_job_flag','มีอาชีพเสี่ยง','yesno'],['risk_job_type','อาชีพเสี่ยง'],['job_detail','รายละเอียดงาน','textarea'],['job_duration','ระยะเวลาทำงาน'],['job_hours','ชั่วโมงสัมผัสจากงาน'],['disease_flag','มีโรคประจำตัว','yesno'],['diseases','โรคประจำตัว','textarea'],['total_score','คะแนนรวมตามข้อมูลจริง','number'],['risk_level','ระดับความเสี่ยงตามข้อมูลจริง','risk'],['notes','หมายเหตุ','textarea']
+];
+const REVIEW_AS01_FIELDS = [['survey_date','วันที่ลงสำรวจ / ประเมิน','date'],['interviewer_name','ผู้ประเมิน'],['target_group','กลุ่มเป้าหมาย'],['cut_point','เกณฑ์คัดเลือก / หมายเหตุ'],['swim_duration','ระยะเวลาว่ายน้ำหรือสัมผัสน้ำ'],['swim_hours','ชั่วโมงสัมผัสน้ำ'],['symptom_flag','มีอาการ','yesno'],['symptoms','อาการ','textarea'],...Array.from({length:11},(_,i)=>['q'+(i+1),'คำตอบข้อ '+(i+1)+' (ไม่ระบุ / ไม่ใช่ / ใช่)','binary'])];
+const REVIEW_AS02_FIELDS = [['form_no','เลขที่แบบ Env-As-02'],['respondent_id','เชื่อมรายชื่อ Env-As-01 ที่ยืนยัน','respondent'],['interview_date','วันที่ซักประวัติ','date'],['interviewer_name','ผู้ซักประวัติ'],['interviewer_role','ตำแหน่งผู้ซักประวัติ'],['weight_kg','น้ำหนัก (กิโลกรัม)','number'],['height_cm','ส่วนสูง (เซนติเมตร)','number'],['hours_at_home','ชั่วโมงอยู่บ้านต่อวัน','number'],['work_out_district','ทำงานนอกอำเภอ','yesno'],['work_out_days','จำนวนวันที่ทำงานนอกอำเภอ','number'],['within_1km_river','บ้านอยู่ในรัศมี 1 กม.'],['herb_usage','การใช้สมุนไพร'],['herb_name','ชื่อสมุนไพร'],['herb_fda','ข้อมูลทะเบียนสมุนไพร'],['smoking_status','การสูบบุหรี่'],['smoking_type','ชนิดบุหรี่'],['smoking_per_day','จำนวนบุหรี่ต่อวัน'],['smoking_years','จำนวนปีที่สูบ'],['smoking_quit_years','จำนวนปีที่เลิก'],['alcohol_status','การดื่มสุรา'],['alcohol_other','รายละเอียดสุรา'],['seafood_freq','ความถี่กินอาหารทะเล'],['seafood_3days','อาหารทะเลใน 3 วันก่อนเก็บตัวอย่าง'],['drink_sources','แหล่งน้ำดื่ม','textarea'],['drink_years','ระยะเวลาใช้น้ำดื่ม'],['use_sources','แหล่งน้ำใช้','textarea'],['use_years','ระยะเวลาใช้น้ำอุปโภค'],['food_rice','แหล่งข้าว'],['food_veg','แหล่งผัก'],['food_fish','แหล่งปลา'],['food_snail','แหล่งหอย'],['home_grown_veg','ผักที่ปลูกเอง'],['home_grown_water','น้ำที่ใช้ปลูกผัก'],['eat_river_veg_weekly','กินผักริมน้ำเป็นประจำ'],['flood_5years','น้ำท่วมบ้านใน 5 ปี']];
+const REVIEW_2Q_FIELDS = [['q2_1','2Q ข้อ 1: หดหู่ เศร้า หรือท้อแท้','yesno'],['q2_2','2Q ข้อ 2: เบื่อ ไม่เพลิดเพลิน','yesno'],['date_2q','วันที่คัดกรอง 2Q','date'],['assessor_2q','ผู้ประเมิน 2Q'],['note_2q','หมายเหตุ 2Q','textarea']];
+function reviewFieldMarkup(field, record) {
+ const [key,label,type='text']=field,value=record[key]??'';let input;
+ let options=null;
+ if(type==='risk')options=['','ต่ำ','ปานกลาง','มาก','ไม่ระบุ'].map(v=>[v,v||'ยังไม่ระบุ']);
+ if(type==='yesno')options=[['','ยังไม่ระบุ'],['ไม่ใช่','ไม่ใช่'],['ใช่','ใช่']];
+ if(type==='binary')options=[['','ยังไม่ระบุ'],['0','ไม่ใช่'],['1','ใช่']];
+ if(type==='well')options=[['','ยังไม่ยืนยันการเชื่อมแหล่งน้ำ'],...state.wells.map(w=>[w.well_id,w.well_id+' '+w.well_name])];
+ if(type==='respondent')options=[['','ยังไม่ยืนยันการเชื่อมรายชื่อ'],...state.respondents.map(r=>[r.id,r.code+' '+r.full_name+' ม.'+r.moo+' ต.'+r.tambon])];
+ if(options) { if(value!==''&&!options.some(o=>String(o[0])===String(value)))options.push([value,value]);input=`<select data-review-key="${key}">${options.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(t)}</option>`).join('')}</select>`; }
+ else if(type==='textarea')input=`<textarea rows="3" data-review-key="${key}">${esc(value)}</textarea>`;
+ else input=`<input data-review-key="${key}" type="${type}" ${type==='number'?'step="any"':''} value="${esc(value)}" ${key==='full_name'?'required':''}>`;
+ return `<div class="form-group"><label>${esc(label)}</label>${input}</div>`;
+}
+function openReviewRecordEditor(stage,id=null,recordStage=1) {
+ const rows=(stage===2||stage==='2q'&&recordStage===2)?state.envAs02:state.respondents;
+ const existing=rows.find(r=>r.id===id);
+ const record=existing||{amphoe:'แม่อาย',province:'เชียงใหม่',status_2q:'ยังไม่คัดกรอง',survey_date:stage===1?bangkokToday():'',interview_date:stage===2?bangkokToday():'',fiscal_year:fiscalYearFromDate(bangkokToday())};
+ const fields=stage==='2q'?REVIEW_2Q_FIELDS:[...REVIEW_COMMON_FIELDS,...(stage===2?REVIEW_AS02_FIELDS:REVIEW_AS01_FIELDS),...REVIEW_2Q_FIELDS];
+ let modal=document.getElementById('review-record-modal');if(!modal){modal=document.createElement('div');modal.id='review-record-modal';modal.className='modal-backdrop';document.body.appendChild(modal);}
+ modal.style.display='flex';
+ const stageArg=JSON.stringify(stage).replace(/"/g,'&quot;');
+ const chooser=stage==='2q'?`<div class="form-group"><label>รายชื่อผู้รับการคัดกรอง</label><select id="review-2q-person" onchange="openReviewRecordEditor('2q',this.value,${recordStage})"><option value="">-- เลือกรายชื่อ --</option>${rows.map(r=>`<option value="${esc(r.id)}" ${r.id===id?'selected':''}>${esc(r.code+' '+r.full_name)}</option>`).join('')}</select></div>`:'';
+ modal.innerHTML=`<div class="modal-dialog modal-lg"><div class="modal-header"><h3>${existing?'แก้ไข':'เพิ่ม'} ${stage==='2q'?'ผลคัดกรอง 2Q':stage===2?'แบบ Env-As-02':'แบบ Env-As-01'}</h3><button type="button" class="btn-close" onclick="closeReviewRecordEditor()">×</button></div><form id="review-record-form" onsubmit="saveReviewRecord(event,${stageArg},'${esc(id||'')}',${recordStage})"><div class="modal-body">${chooser}<p class="data-note">แก้ไขข้อมูลแบบฟอร์มได้ครบ ช่องที่ไม่มีข้อมูลให้เว้นว่าง คะแนนและระดับความเสี่ยงเดิมจะไม่ถูกคำนวณทับจากคำตอบที่ยังไม่ระบุ</p>${existing?.source?`<p>ต้นฉบับ: ${esc(existing.source.sheet||existing.source_tab)} แถว ${existing.source.row||'ไม่ระบุ'} (เก็บที่มาเดิมไว้)</p>`:''}<div class="form-grid-2">${fields.map(f=>reviewFieldMarkup(f,record)).join('')}</div></div><div class="modal-footer"><button class="btn btn-primary" type="submit">บันทึกข้อมูล</button><button class="btn btn-outline" type="button" onclick="closeReviewRecordEditor()">ยกเลิก</button>${existing?`<button class="btn btn-danger" type="button" onclick="deleteReviewRecord(${stageArg},'${esc(id)}',${recordStage})">${stage==='2q'?'ลบเฉพาะผล 2Q':'ลบรายการนี้'}</button>`:''}</div></form></div>`;
+}
+function closeReviewRecordEditor() {const modal=document.getElementById('review-record-modal');if(modal)modal.style.display='none';}
+function saveReviewRecord(e,stage,id,recordStage=1) {
+ e.preventDefault();const rows=(stage===2||stage==='2q'&&recordStage===2)?state.envAs02:state.respondents;
+ if(stage==='2q')id=document.getElementById('review-2q-person').value||id;
+ if(stage==='2q'&&!id){alert('กรุณาเลือกรายชื่อก่อนบันทึก');return;}
+ const current=rows.find(r=>r.id===id),fields=stage==='2q'?REVIEW_2Q_FIELDS:[...REVIEW_COMMON_FIELDS,...(stage===2?REVIEW_AS02_FIELDS:REVIEW_AS01_FIELDS),...REVIEW_2Q_FIELDS];
+ const result={...(current||{}),id:current?.id||`MANUAL-${stage}-${Date.now()}`,recorded_at:current?.recorded_at||new Date().toISOString(),updated_at:new Date().toISOString(),updated_by:state.currentUser?.displayName||'ผู้ใช้งาน'};
+ for(const [key,,type='text'] of fields){const input=document.querySelector(`#review-record-form [data-review-key="${key}"]`);if(!input)continue;const v=input.value.trim();result[key]=(type==='number'||type==='binary')?optionalNumber(v):v;}
+ const q1=result.q2_1,q2=result.q2_2;
+ result.status_2q=q1==='ใช่'||q2==='ใช่'?'พบความเสี่ยง (Positive 2Q)':q1==='ไม่ใช่'&&q2==='ไม่ใช่'?'ปกติ (ไม่พบความเสี่ยง)':'ยังไม่คัดกรอง';
+ if(stage!=='2q'){
+  const dateKey=stage===2?'interview_date':'survey_date';
+  if(!current&&!result[dateKey]){result[dateKey]=bangkokToday();result.date_basis='recorded_date_default';}
+  else if(result[dateKey]!==current?.[dateKey])result.date_basis=!current&&result[dateKey]===bangkokToday()?'recorded_date_default':'user_entered';
+  result.fiscal_year=fiscalYearFromDate(result[dateKey])||Number(result.fiscal_year)||recordFiscalYear(current||{},stage)||fiscalYearFromDate(bangkokToday());
+  result.source_tab=(stage===2?'เก็บแม่อาย':'ประเมินแม่อาย')+' '+result.fiscal_year;
+  if(!current){result.seq=Math.max(0,...rows.map(r=>Number(r.seq)||0))+1;result.source_year=result.fiscal_year;result.dataset=stage===2?'collection':'assessment';}
+ }
+ if(stage===2){
+  result.history_updated=true;
+  result.as01_prefill_exclusions={...(current?.as01_prefill_exclusions||{})};
+  for(const field of AS01_HISTORY_FIELDS){
+   if(!historyValuePresent(result[field])&&historyValuePresent(current?.[field]))result.as01_prefill_exclusions[field]=true;
+   else if(historyValuePresent(result[field]))delete result.as01_prefill_exclusions[field];
+  }
+  if(current?.respondent_id&&!result.respondent_id)result.as01_auto_link_disabled=true;
+  if(result.respondent_id)result.as01_auto_link_disabled=false;
+  fillAS02HistoryFromAS01(result);
+  result.link_status=result.respondent_id?'เชื่อมกับ AS-01 แล้ว':'ยังไม่เชื่อมกับ AS-01';
+ }
+ const index=rows.findIndex(r=>r.id===result.id);if(index<0)rows.push(result);else rows[index]=result;
+ if(stage!=='2q'){state.fiscalYear=result.fiscal_year;try{localStorage.setItem('MAEAI_ONLINE_FISCAL_YEAR',String(state.fiscalYear));}catch(e){}}
+ saveLocalData();closeReviewRecordEditor();
+ postToGoogleSheets({action:stage===2||stage==='2q'&&recordStage===2?'saveEnvAs02':'saveRespondent',data:result});
+}
+function deleteReviewRecord(stage,id,recordStage=1) {
+ const rows=(stage===2||stage==='2q'&&recordStage===2)?state.envAs02:state.respondents;
+ const record=rows.find(r=>r.id===id);if(!record)return;
+ if(!confirm(stage==='2q'?`ลบเฉพาะผล 2Q ของ ${record.full_name}? ทะเบียนและผลประเมินสารหนูยังอยู่`:`ลบรายการ ${record.full_name} ใน ${stage===2?'Env-As-02':'Env-As-01'}? รายการอีกแบบฟอร์มจะยังอยู่`))return;
+ if(stage==='2q'){for(const [key] of REVIEW_2Q_FIELDS)record[key]='';record.status_2q='ยังไม่คัดกรอง';}
+ else if(stage===2)state.envAs02=state.envAs02.filter(r=>r.id!==id);
+ else {state.respondents=state.respondents.filter(r=>r.id!==id);state.envAs02.forEach(r=>{if(r.respondent_id===id){r.respondent_id='';r.as01_auto_link_disabled=true;r.link_status='รายการขั้นแรกถูกลบ รอตรวจสอบลิงก์';}});}
+ saveLocalData();closeReviewRecordEditor();
+ postToGoogleSheets(stage==='2q'?{action:recordStage===2?'saveEnvAs02':'saveRespondent',data:record}:{action:stage===2?'deleteEnvAs02':'deleteRespondent',id});
+}
+function openRespondentModal(id=null) {openRestoredScreeningForm(1,id);}
+function openEnvAs02Modal(id=null) {openRestoredScreeningForm(2,id);}
+function open2QModal(id=null) {openReviewRecordEditor('2q',id,1);}
+function open2QModalForAs02(id) {openReviewRecordEditor('2q',id,2);}
+
+
+// The original, sectioned forms are the primary editors. Preserve all extra/source fields.
+const DETAILED_SHARED_FIELDS = {
+ full_name:'name',age:'age',gender:'gender',cid:'cid',house_no:'house',moo:'moo',tambon:'tambon',
+ marital_status:'marital',education:'edu',exposure_years:'exposure-years',risk_job_flag:'job-flag',
+ risk_job_type:'job-type',job_detail:'job-detail',job_duration:'job-duration',job_hours:'job-hours',
+ diseases:'diseases',phone:'phone',fiscal_year:'fiscal-year',notes:'notes',latitude:'lat',longitude:'lng',
+ q2_1:'q2-1',q2_2:'q2-2',date_2q:'date-2q',assessor_2q:'assessor-2q',note_2q:'note-2q'
+};
+const DETAILED_AS01_FIELDS = {
+ weight_kg:'weight',height_cm:'height',
+ code:'code',survey_date:'survey-date',target_group:'target-group',cut_point:'cut-point',well_id:'well-id',
+ health_center:'hc',interviewer_name:'interviewer',years_in_area:'years-area',disease_flag:'disease-flag',
+ swim_duration:'swim-duration',swim_hours:'swim-hours',symptom_flag:'symptom-flag',symptoms:'symptoms'
+};
+const DETAILED_AS02_FIELDS = {
+ code:'code',form_no:'form-no',respondent_id:'fill-from-resp',interview_date:'date',well_id:'well-id',
+ weight_kg:'weight',height_cm:'height',years_in_area:'years',hours_at_home:'hours-home',
+ work_out_district:'out-district',work_out_days:'out-days',within_1km_river:'within-1km',
+ herb_usage:'herb',herb_name:'herb-name',smoking_status:'smoking',smoking_detail:'smoking-detail',
+ alcohol_status:'alcohol',seafood_freq:'seafood-freq',seafood_3days:'seafood-3days',
+ drink_sources:'drink-sources',drink_years:'drink-years',use_sources:'use-sources',use_years:'use-years',
+ food_rice:'food-rice',food_veg:'food-veg',food_fish:'food-fish',food_snail:'food-snail',
+ home_grown_veg:'home-veg',home_grown_water:'home-water',eat_river_veg_weekly:'eat-river-veg',
+ flood_5years:'flood-5y',interviewer_name:'interviewer',interviewer_role:'role',health_center:'hc'
+};
+const DETAILED_NUMERIC_FIELDS = new Set(['age','fiscal_year','latitude','longitude','exposure_years','weight_kg','height_cm']);
+function detailedFields(stage) {return {...DETAILED_SHARED_FIELDS,...(stage===2?DETAILED_AS02_FIELDS:DETAILED_AS01_FIELDS)};}
+function detailedOtherBase(prefix,suffix) {
+ const aliases={'target-group':'target','food-rice':'rice','food-veg':'veg','food-fish':'fish','food-snail':'snail'};
+ return prefix+'-'+(aliases[suffix]||suffix);
+}
+function setDetailedField(prefix,suffix,value) {
+ const el=document.getElementById(prefix+'-'+suffix);if(!el)return;
+ const text=value??'';
+ if(el.tagName==='SELECT'){
+  if(!Array.from(el.options).some(o=>o.value===''))el.insertAdjacentHTML('afterbegin','<option value="">-- ยังไม่ระบุ --</option>');
+  // Match original options regardless of a legacy numeric prefix; keep all other values verbatim.
+  const key=v=>String(v).replace(/^\d+\s*[).]\s*/,'').trim();
+  const known=Array.from(el.options).find(o=>o.value!=='OTHER'&&key(o.value)===key(text));
+  if(known)el.value=known.value;
+  else if(text!==''&&Array.from(el.options).some(o=>o.value==='OTHER')){
+   el.value='OTHER';const wrap=document.getElementById(detailedOtherBase(prefix,suffix)+'-other-wrap');
+   if(wrap){wrap.style.display='block';const input=wrap.querySelector('input');if(input)input.value=text;}
+  }else if(text!==''){
+   el.insertAdjacentHTML('beforeend',`<option value="${esc(text)}">${esc(text)}</option>`);el.value=String(text);
+  }else el.value='';
+ }else el.value=text;
+}
+function getDetailedField(prefix,suffix) {
+ const el=document.getElementById(prefix+'-'+suffix);if(!el)return undefined;
+ if(el.tagName==='SELECT'&&el.value==='OTHER')return document.getElementById(detailedOtherBase(prefix,suffix)+'-other')?.value.trim()||'';
+ return el.value.trim();
+}
+function screening2QResult(q1,q2) {
+ return q1==='ใช่'||q2==='ใช่'?'พบความเสี่ยง (Positive 2Q)':q1==='ไม่ใช่'&&q2==='ไม่ใช่'?'ปกติ (ไม่พบความเสี่ยง)':'ยังไม่คัดกรอง';
+}
+function recalcModalAs01_2Q(){setDetailed2QStatus('resp');}
+function recalcModalAs02_2Q(){setDetailed2QStatus('as02');}
+function setDetailed2QStatus(prefix) {
+ const out=document.getElementById(prefix+'-status-2q');if(out)out.value=screening2QResult(getDetailedField(prefix,'q2-1'),getDetailedField(prefix,'q2-2'));
+}
+function riskFromAssessmentScore(score){return score>=20?'มาก':score>=10?'ปานกลาง':'ต่ำ';}
+const recalcOriginalScreeningScore = recalcScore;
+recalcScore = function() {
+ const context=state.detailedScreening;
+ const score=recalcOriginalScreeningScore();
+ if(!context||context.stage!==1)return score;
+ const complete=document.getElementById('as01-assessment-complete')?.checked;
+ const note=document.getElementById('as01-source-score-note');
+ if(note)note.textContent=complete?'คะแนนคำนวณจากคำตอบทั้ง 11 ข้อตามค่าน้ำหนักในแบบฟอร์ม':
+  historyValuePresent(context.record.total_score)?`คะแนนเดิมตามต้นฉบับ ${context.record.total_score} (${context.record.risk_level||'ไม่ระบุ'}) จะคงไว้จนกว่าจะยืนยันการประเมินครบ 11 ข้อ`:
+  'ติ๊กข้อที่ตอบใช่ แล้วกดยืนยันประเมินครบ 11 ข้อ เพื่อบันทึกคะแนนและระดับความเสี่ยง';
+ if(!complete){
+  const badge=document.getElementById('calc-risk-badge');if(badge){badge.className='risk-badge';badge.textContent='รอยืนยันประเมินครบ 11 ข้อ';}
+  setText('calc-measure-text','คะแนนด้านซ้ายเป็นผลรวมคำตอบที่ติ๊กในขณะนี้');
+  for(const key of ['low','med','high'])document.getElementById('criteria-row-'+key)?.classList.remove('risk-criteria-row-active');
+ }
+ return score;
+};
+function setAS02FormNumberRequirement(isEditing) {
+ const input=document.getElementById('as02-form-no');
+ if(input)input.required=!isEditing;
+ setText('as02-form-no-label',isEditing?'เลขที่แบบฟอร์ม Env-As-02 (ไม่บังคับเมื่อแก้ไข)':'เลขที่แบบฟอร์ม Env-As-02 *');
+ setText('as02-form-no-hint',isEditing?'เว้นว่างได้ ระบบแก้ไขรายการเดิมด้วยรหัสรายการ ไม่เพิ่มเป็นรายใหม่':'เพิ่มรายการใหม่ต้องระบุเลขที่แบบฟอร์ม');
+}
+function openRestoredScreeningForm(stage,id) {
+ state.detailedScreening=null;
+ const rows=stage===2?state.envAs02:state.respondents;
+ const existing=rows.find(r=>r.id===id);if(id&&!existing)return;
+ if(stage===2)openDetailedEnvAs02(id);else openDetailedRespondentModal(id);
+ const prefix=stage===2?'as02':'resp',form=document.getElementById(stage===2?'env-as02-form':'respondent-form');
+ const seq=Math.max(0,...rows.map(r=>Number(r.seq)||0))+1;
+ const year=fiscalYearFromDate(bangkokToday());
+ const record=existing||{id:`MANUAL-${stage}-${Date.now()}`,seq,code:stage===1?`NM${String(seq).padStart(3,'0')}`:'',
+  form_no:stage===2?`${String(year).slice(-2)}-${String(seq).padStart(4,'0')}`:'',
+  [stage===2?'interview_date':'survey_date']:bangkokToday(),fiscal_year:year,
+  amphoe:'แม่อาย',province:'เชียงใหม่',status_2q:'ยังไม่คัดกรอง'};
+ state.detailedScreening={stage,record,existing:Boolean(existing),changedAnswers:new Set()};
+ for(const [key,suffix] of Object.entries(detailedFields(stage)))setDetailedField(prefix,suffix,record[key]);
+ setDetailedField(prefix,'id',record.id);
+ setDetailedField(prefix,'amphoe-prov',[record.amphoe,record.province].filter(Boolean).join(' / '));
+ if(stage===1){
+  document.getElementById('resp-no-cid').checked=Boolean(record.no_cid||record.cid==='ไม่มีเลข 13 หลัก');
+  for(let i=1;i<=11;i++){
+   const el=document.getElementById('env-q'+i),answer=record['q'+i];
+   el.checked=Number(answer)===1;el.indeterminate=!historyValuePresent(answer);
+   el.onchange=()=>{el.indeterminate=false;state.detailedScreening.changedAnswers.add(i);recalcScore();};
+  }
+  document.getElementById('as01-assessment-complete').checked=Array.from({length:11},(_,i)=>record['q'+(i+1)]).every(v=>historyValuePresent(v)&&[0,1].includes(Number(v)));
+  for(const [cls,key] of [['as01-occ-chk','risk_job_type'],['as01-dis-chk','diseases'],['as01-sym-chk','symptoms']])populateCheckboxesFromString(cls,record[key]);
+  recalcScore();
+ }else{
+  setAS02FormNumberRequirement(Boolean(existing));
+  populateCheckboxesFromString('as02-occ-chk',record.risk_job_type);
+  restoreAS02WaterSources(record);
+ }
+ setDetailedField(prefix,'status-2q',record.status_2q||screening2QResult(record.q2_1,record.q2_2));
+ form.onsubmit=e=>saveRestoredScreeningForm(e,stage);
+}
+function collectRestoredScreeningRecord(stage) {
+ const context=state.detailedScreening,prefix=stage===2?'as02':'resp';
+ const record={...context.record};
+ for(const [key,suffix] of Object.entries(detailedFields(stage))){
+  const value=getDetailedField(prefix,suffix);if(value===undefined)continue;
+  record[key]=DETAILED_NUMERIC_FIELDS.has(key)?optionalNumber(value):value;
+ }
+ const area=getDetailedField(prefix,'amphoe-prov')??'';
+ const parts=area.split('/').map(s=>s.trim());record.amphoe=parts[0];
+ record.province=parts.length>1?parts.slice(1).join(' / '):area?context.record.province||'':'';
+ const dateKey=stage===2?'interview_date':'survey_date';
+ record.fiscal_year=fiscalYearFromDate(record[dateKey])||Number(record.fiscal_year)||recordFiscalYear(context.record,stage)||fiscalYearFromDate(bangkokToday());
+ record.source_tab=(stage===2?'เก็บแม่อาย':'ประเมินแม่อาย')+' '+record.fiscal_year;
+ record.recorded_at=context.record.recorded_at||new Date().toISOString();record.updated_at=new Date().toISOString();
+ record.updated_by=state.currentUser?.displayName||'ผู้ใช้งาน';
+ if(!context.existing){record.source_year=record.fiscal_year;record.dataset=stage===2?'collection':'assessment';record.date_basis='recorded_date_default';}
+ else if(record[dateKey]!==context.record[dateKey])record.date_basis='user_entered';
+ const qChanged=['q2_1','q2_2'].some(k=>(record[k]||'')!==(context.record[k]||''));
+ record.status_2q=qChanged||record.q2_1||record.q2_2?screening2QResult(record.q2_1,record.q2_2):context.record.status_2q||'ยังไม่คัดกรอง';
+ if(stage===1){
+  record.no_cid=document.getElementById('resp-no-cid').checked;
+  if(record.no_cid)record.cid='ไม่มีเลข 13 หลัก';
+  if(document.getElementById('as01-assessment-complete').checked){
+   record.total_score=0;
+   for(let i=1;i<=11;i++){record['q'+i]=document.getElementById('env-q'+i).checked?1:0;record.total_score+=record['q'+i]*ENV_WEIGHTS['q'+i];}
+   record.risk_level=riskFromAssessmentScore(record.total_score);record.assessment_complete=true;record.assessment_scoring_basis='Env-As-01_22.05.69(แม่อาย)';
+  }else if(!context.existing){record.total_score=null;record.risk_level='ไม่ระบุ';record.assessment_complete=false;}
+ }else{
+  for(const kind of ['drink','use']){const history=collectAS02WaterSources(kind);record[kind+'_source_years']=history.years;record[kind+'_sources_other']=history.extra;record[kind+'_sources']=formatWaterSources(record,kind);}
+  record.history_updated=true;record.history_complete=Boolean(record.interview_date&&record.interviewer_name);
+  record.as01_prefill_exclusions={...(context.record.as01_prefill_exclusions||{})};
+  for(const field of AS01_HISTORY_FIELDS){
+   if(!historyValuePresent(record[field])&&historyValuePresent(context.record[field]))record.as01_prefill_exclusions[field]=true;
+   else if(historyValuePresent(record[field]))delete record.as01_prefill_exclusions[field];
+  }
+  if(context.record.respondent_id&&!record.respondent_id)record.as01_auto_link_disabled=true;
+  if(record.respondent_id)record.as01_auto_link_disabled=false;
+  fillAS02HistoryFromAS01(record);
+  record.link_status=record.respondent_id?'เชื่อมกับ AS-01 แล้ว':'ยังไม่เชื่อมกับ AS-01';
+ }
+ return record;
+}
+async function saveRestoredScreeningForm(e,stage) {
+ e.preventDefault();
+ if(stage===2&&!state.detailedScreening.existing&&!getDetailedField('as02','form-no')){alert('กรุณาระบุเลขที่แบบฟอร์มสำหรับรายการใหม่');return;}
+ if(stage===1&&state.detailedScreening.changedAnswers.size&&!document.getElementById('as01-assessment-complete').checked){
+  alert('กรุณายืนยันว่าประเมินครบทั้ง 11 ข้อแล้ว ก่อนบันทึกคำตอบและคำนวณคะแนนใหม่');return;
+ }
+ const record=collectRestoredScreeningRecord(stage);if(!record.full_name){alert('กรุณาระบุชื่อ–นามสกุล');return;}
+ if(stage===1&&(historyValuePresent(record.latitude)!==historyValuePresent(record.longitude))){alert('กรุณาระบุพิกัดให้ครบทั้งละติจูดและลองจิจูด หรือเว้นว่างทั้งสองช่องหากยังไม่ทราบ');return;}
+ const rows=stage===2?state.envAs02:state.respondents,index=rows.findIndex(r=>r.id===record.id);
+ if(index<0)rows.push(record);else rows[index]=record;
+ state.fiscalYear=record.fiscal_year;try{localStorage.setItem('MAEAI_ONLINE_FISCAL_YEAR',String(record.fiscal_year));}catch(e){}
+ saveLocalData();if(stage===2)closeEnvAs02Modal();else closeRespondentModal();
+ await postToGoogleSheets({action:stage===2?'saveEnvAs02':'saveRespondent',data:record});
+}
+function autofillAs02FromRespondent(id) {
+ const source=state.respondents.find(r=>r.id===id);if(!source)return;
+ const fields=detailedFields(2);
+ for(const key of AS01_HISTORY_FIELDS){if(fields[key]&&historyValuePresent(source[key]))setDetailedField('as02',fields[key],source[key]);}
+ setDetailedField('as02','amphoe-prov',[source.amphoe,source.province].filter(Boolean).join(' / '));
+ populateCheckboxesFromString('as02-occ-chk',source.risk_job_type);
+ restoreAS02WaterSources(source);
+ // The current AS-02 interview keeps its own 2Q answers and interview date.
 }

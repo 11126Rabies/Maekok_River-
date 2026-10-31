@@ -1,0 +1,2 @@
+﻿well_id,sample_code,sample_date,lab_name,standard_type,ph,colour,turbidity,tds,hardness,fe,mn,cu,zn,pb,cr,cd,as_val,hg,so4,cl,no3,f,residual_cl,total_coliform,faecal_coliform,notes
+,EXAMPLE-P01,2026-10-31,ห้องปฏิบัติการตัวอย่าง,DOH_2543,7.2,,,,,,,,,ND,,,<0.005,,,,,,,,,ข้อมูลสมมติ ไม่ใช่ผลตรวจจริง
