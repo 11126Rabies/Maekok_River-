@@ -1502,3 +1502,9 @@ h1, h2, h3, h4, .nav-tab, .btn {
 .dashboard-village-open {margin-top:4px;font-size:11px;padding:3px 6px;}
 .dashboard-village-dialog .table-responsive {max-height:60vh;}
 .dashboard-village-list th,.dashboard-village-list td {white-space:normal;}
+.screening-row-actions {display:flex;flex-wrap:wrap;gap:6px;min-width:135px;}
+.screening-delete-dialog {max-width:620px;}
+.screening-delete-details {display:grid;grid-template-columns:minmax(140px,1fr) 2fr;gap:8px 16px;margin:18px 0;}
+.screening-delete-details dt {font-weight:700;}
+.screening-delete-details dd {margin:0;overflow-wrap:anywhere;}
+@media(max-width:520px){.screening-delete-details{grid-template-columns:1fr;gap:4px;}.screening-delete-details dd{margin-bottom:10px;}}
