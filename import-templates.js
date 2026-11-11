@@ -523,7 +523,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 1,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q2",
@@ -531,7 +531,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 1,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q3",
@@ -539,7 +539,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q4",
@@ -547,7 +547,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q5",
@@ -555,7 +555,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q6",
@@ -563,7 +563,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q7",
@@ -571,7 +571,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q8",
@@ -579,7 +579,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q9",
@@ -587,7 +587,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q10",
@@ -595,7 +595,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "q11",
@@ -603,7 +603,7 @@ const IMPORT_SCHEMAS = {
         "type": "binary",
         "required": false,
         "example": 0,
-        "note": "1 = ใช่, 0 = ไม่ใช่; เว้นว่างหากยังไม่ประเมิน; ระบบคำนวณคะแนนเมื่อครบ 11 ข้อ"
+        "note": "1 หรือ ใช่; 0 หรือ ไม่ใช่; ไม่ทราบ หรือเว้นว่าง คือยังสรุปคะแนนไม่ได้"
       },
       {
         "key": "target_group",
@@ -683,7 +683,7 @@ const IMPORT_SCHEMAS = {
         "type": "text",
         "required": false,
         "example": "ไม่ใช่",
-        "note": "ใช่ / ไม่ใช่; เว้นว่างหมายถึงยังไม่ได้ตอบ ไม่ใช้คำว่าปกติแทนคำตอบ"
+        "note": "มี / ไม่มี หรือ ใช่ / ไม่ใช่; เว้นว่างเมื่อยังไม่ตอบ"
       },
       {
         "key": "q2_2",
@@ -691,7 +691,7 @@ const IMPORT_SCHEMAS = {
         "type": "text",
         "required": false,
         "example": "ไม่ใช่",
-        "note": "ใช่ / ไม่ใช่; เว้นว่างหมายถึงยังไม่ได้ตอบ ไม่ใช้คำว่าปกติแทนคำตอบ"
+        "note": "มี / ไม่มี หรือ ใช่ / ไม่ใช่; เว้นว่างเมื่อยังไม่ตอบ"
       },
       {
         "key": "date_2q",
@@ -748,6 +748,102 @@ const IMPORT_SCHEMAS = {
         "required": false,
         "example": "",
         "note": "เว้นว่างได้เมื่อไม่มีข้อมูล"
+      },
+      {
+        "key": "exposure_status",
+        "label": "สถานะการสัมผัสในแบบสำรวจ",
+        "type": "text",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_source_types",
+        "label": "ประเภทแหล่งน้ำที่ใช้อุปโภคบริโภค",
+        "type": "text",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_source_other",
+        "label": "รายละเอียดแหล่งน้ำอื่น ๆ",
+        "type": "text",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_source_name",
+        "label": "ชื่อหรือรหัสแหล่งน้ำที่ทราบ",
+        "type": "text",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_bore_lat",
+        "label": "ละติจูด บ่อบาดาล",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_bore_lng",
+        "label": "ลองจิจูด บ่อบาดาล",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_shallow_lat",
+        "label": "ละติจูด บ่อน้ำตื้น",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_shallow_lng",
+        "label": "ลองจิจูด บ่อน้ำตื้น",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_mountain_lat",
+        "label": "ละติจูด ประปาภูเขา",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_mountain_lng",
+        "label": "ลองจิจูด ประปาภูเขา",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_other_lat",
+        "label": "ละติจูด อื่น ๆ",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
+      },
+      {
+        "key": "water_other_lng",
+        "label": "ลองจิจูด อื่น ๆ",
+        "type": "number",
+        "required": false,
+        "example": "",
+        "note": "ข้อมูลตามแบบ อสม.; เว้นว่างได้หากยังไม่ทราบ"
       }
     ]
   },
@@ -1457,7 +1553,8 @@ function parseCsvRows(text) {
 }
 function downloadTemplateCsv(type) {
   const schema=IMPORT_SCHEMAS[type];if(!schema)return;
-  csvFile(`template_import_${type}.csv`,schema.fields.map(f=>f.key),[schema.fields.map(f=>f.example)]);
+  const rows=type==='as01'?[]:[schema.fields.map(f=>f.example)];
+  csvFile(`template_import_${type}.csv`,schema.fields.map(f=>f.key),rows);
 }
 function validateImportDate(value,key,row) {
   if(!value)return;
@@ -1480,16 +1577,22 @@ function buildImportRecords(type,text,existingState=state) {
       const value=r[field.key]??'';
       if(field.required&&!value)throw Error(`แถว ${line}: ต้องกรอก ${field.key}`);
       if(field.type==='number'&&value!=='') {
-        if(!Number.isFinite(Number(value))||Number(value)<0)throw Error(`แถว ${line}: ${field.key} ต้องเป็นจำนวนไม่ติดลบ`);
+        if(!Number.isFinite(Number(value))||(!/^water_.*_(lat|lng)$/.test(field.key)&&Number(value)<0))throw Error(`แถว ${line}: ${field.key} ต้องเป็นตัวเลขที่ถูกต้อง`);
+        if(/^water_.*_lat$/.test(field.key)&&Math.abs(Number(value))>90||/^water_.*_lng$/.test(field.key)&&Math.abs(Number(value))>180)throw Error(`แถว ${line}: ${field.key} อยู่นอกช่วงพิกัด`);
         r[field.key]=Number(value);
       }
       if(field.type==='binary'&&value!=='') {
-        if(!['0','1'].includes(value))throw Error(`แถว ${line}: ${field.key} ใช้ 0 หรือ 1 เท่านั้น`);
-        r[field.key]=Number(value);
+        const answer=type==='as01'?({'ใช่':'1','ไม่ใช่':'0','ไม่ทราบ':'ไม่ทราบ'}[value]??value):value;
+        if(!['0','1','ไม่ทราบ'].includes(answer)||type!=='as01'&&answer==='ไม่ทราบ')throw Error(`แถว ${line}: ${field.key} ใช้ ใช่ / ไม่ใช่ / ไม่ทราบ หรือ 1 / 0`);
+        r[field.key]=answer==='ไม่ทราบ'?'ไม่ทราบ':Number(answer);
       }
       if(field.type==='date')validateImportDate(value,field.key,line);
     }
-    for(const key of ['q2_1','q2_2'])if(r[key]&&!['ใช่','ไม่ใช่'].includes(r[key]))throw Error(`แถว ${line}: ${key} ใช้ ใช่ / ไม่ใช่`);
+    for(const key of ['q2_1','q2_2']){
+      if(type==='as01'&&r[key]==='มี')r[key]='ใช่';
+      if(type==='as01'&&r[key]==='ไม่มี')r[key]='ไม่ใช่';
+      if(r[key]&&!['ใช่','ไม่ใช่'].includes(r[key]))throw Error(`แถว ${line}: ${key} ใช้ มี / ไม่มี หรือ ใช่ / ไม่ใช่`);
+    }
     if(type==='as01'||type==='as02') {
       const stage=type==='as02'?2:1,dateKey=stage===2?'interview_date':'survey_date';
       if(!r[dateKey]&&!r.fiscal_year)throw Error(`แถว ${line}: ระบุ ${dateKey} หรือ fiscal_year เพื่อเลือกปีงบประมาณ`);
@@ -1499,9 +1602,11 @@ function buildImportRecords(type,text,existingState=state) {
       r.source_year=r.fiscal_year;r.dataset=stage===2?'collection':'assessment';r.status_2q=screening2QResult(r.q2_1,r.q2_2);
       if(r.well_id&&!existingState.wells.some(w=>w.well_id===r.well_id))throw Error(`แถว ${line}: ไม่พบทะเบียนแหล่งน้ำ ${r.well_id}`);
       if(type==='as01') {
+        r.health_center=canonicalHealthCenter(r.health_center);
         const complete=Array.from({length:11},(_,j)=>r['q'+(j+1)]).every(v=>v!==''&&v!==undefined&&v!==null&&[0,1].includes(v));
         r.assessment_complete=complete;
         if(complete){r.total_score=Array.from({length:11},(_,j)=>(r['q'+(j+1)]||0)*ENV_WEIGHTS['q'+(j+1)]).reduce((a,b)=>a+b,0);r.risk_level=riskFromAssessmentScore(r.total_score);}
+        else if(Array.from({length:11},(_,j)=>r['q'+(j+1)]).includes('ไม่ทราบ')){r.total_score=null;r.risk_level='ไม่ระบุ';}
         else{r.total_score=optionalNumber(r.total_score);r.risk_level=r.risk_level||'ไม่ระบุ';}
       } else {
         for(const kind of ['drink','use']) {

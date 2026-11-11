@@ -2222,6 +2222,7 @@ function canonicalTambon(tambon,moo) {
 function normalizeStageRecord(record,stage) {
  const hydrated=backfillBasicProfile(record,stage);
  const r=stage===1?normalizeRespondentRecord(hydrated,0):{...hydrated};
+ r.health_center=canonicalHealthCenter(r.health_center);
  const corrected=canonicalTambon(r.tambon,r.moo);
  if(corrected!==r.tambon){r.source_tambon=r.source_tambon||r.tambon;r.area_correction='แก้พื้นที่ตามคำยืนยันผู้ใช้';r.tambon=corrected;}
  r.fiscal_year=recordFiscalYear(r,stage)||2569;
@@ -2276,7 +2277,7 @@ function sortedWaterLabs(rows) {
 
 // Source-grounded calculations, 2569 revision. Historical source rows remain separate by stage.
 const DATA_VERSION = 'MAEAI_FISCAL_20261030_V2';
-const RELEASE_VERSION = '2026-10-31-delete-risk-guidance';
+const RELEASE_VERSION = '2026-11-11-as01-survey';
 const ONLINE_API_REVISION = 'MAEAI_ONLINE_20261031';
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function setText(id, value) { const el=document.getElementById(id); if(el) el.textContent=value; }
@@ -2381,6 +2382,16 @@ function updateKpiCards() {
  setText('dynamic-source-notice',`ปีงบประมาณ ${state.fiscalYear}: Env-As-01 ${a.length} ราย → Env-As-02/เก็บปัสสาวะ ${b.length} ราย เป็นการติดตาม ไม่บวกเป็นจำนวนคนใหม่`);
 }
 // Both stages retain their own totals; follow-up records are never added to AS-01 totals.
+function canonicalHealthCenter(value) {
+ const name=String(value??'').trim();
+ const aliases={
+  'รพ.สต.ท่าตอน':'รพ.สต.บ้านท่าตอน',
+  'รพ.สต.ท่ามะแกง':'รพ.สต.บ้านท่ามะแกง',
+  'รพ.สต.บ้านเมืองงาม':'รพ.สต.บ้านเมืองงาม',
+  'รพ.สต.แม่เมืองน้อย':'รพ.สต.บ้านแม่เมืองน้อย'
+ };
+ return Object.prototype.hasOwnProperty.call(aliases,name)?aliases[name]:name;
+}
 function dashboardGroupLabel(value) {return String(value??'').trim()||'ไม่ระบุ';}
 function dashboardRiskCounts(rows) {return ['ต่ำ','ปานกลาง','มาก'].map(level=>rows.filter(r=>r.risk_level===level).length);}
 function dashboardStageCountCells(as01,as02) {
@@ -3045,6 +3056,9 @@ const DETAILED_AS01_FIELDS = {
  weight_kg:'weight',height_cm:'height',
  code:'code',survey_date:'survey-date',target_group:'target-group',cut_point:'cut-point',well_id:'well-id',
  health_center:'hc',interviewer_name:'interviewer',years_in_area:'years-area',disease_flag:'disease-flag',
+ exposure_status:'exposure-status',water_source_types:'water-source-types',water_source_other:'water-source-other',water_source_name:'water-source-name',
+ water_bore_lat:'water-bore-lat',water_bore_lng:'water-bore-lng',water_shallow_lat:'water-shallow-lat',water_shallow_lng:'water-shallow-lng',
+ water_mountain_lat:'water-mountain-lat',water_mountain_lng:'water-mountain-lng',water_other_lat:'water-other-lat',water_other_lng:'water-other-lng',
  swim_duration:'swim-duration',swim_hours:'swim-hours',symptom_flag:'symptom-flag',symptoms:'symptoms'
 };
 const DETAILED_AS02_FIELDS = {
@@ -3058,7 +3072,7 @@ const DETAILED_AS02_FIELDS = {
  home_grown_veg:'home-veg',home_grown_water:'home-water',eat_river_veg_weekly:'eat-river-veg',
  flood_5years:'flood-5y',interviewer_name:'interviewer',interviewer_role:'role',health_center:'hc'
 };
-const DETAILED_NUMERIC_FIELDS = new Set(['age','fiscal_year','latitude','longitude','exposure_years','weight_kg','height_cm']);
+const DETAILED_NUMERIC_FIELDS = new Set(['age','fiscal_year','latitude','longitude','exposure_years','weight_kg','height_cm','water_bore_lat','water_bore_lng','water_shallow_lat','water_shallow_lng','water_mountain_lat','water_mountain_lng','water_other_lat','water_other_lng']);
 function detailedFields(stage) {return {...DETAILED_SHARED_FIELDS,...(stage===2?DETAILED_AS02_FIELDS:DETAILED_AS01_FIELDS)};}
 function detailedOtherBase(prefix,suffix) {
  const aliases={'target-group':'target','food-rice':'rice','food-veg':'veg','food-fish':'fish','food-snail':'snail'};
@@ -3066,14 +3080,22 @@ function detailedOtherBase(prefix,suffix) {
 }
 function setDetailedField(prefix,suffix,value) {
  const el=document.getElementById(prefix+'-'+suffix);if(!el)return;
- const text=value??'';
+ let text=suffix==='hc'?canonicalHealthCenter(value):value??'';
+ if(prefix==='resp'&&suffix==='target-group'){
+  if(text==='กลุ่มเดิม 68')text='กลุ่มเดิม';
+  if(text==='ประชาชนทั่วไป (แท็บประเมินแม่อาย 2569)'||text==='ประชาชนทั่วไป (แท็บการตอบกลับ)')text='ประชาชนทั่วไป';
+ }
  if(suffix==='well-id'&&['resp','as02'].includes(prefix)){populateScreeningWellSelect(prefix+'-well-id',text);return;}
  if(el.tagName==='SELECT'){
   if(!Array.from(el.options).some(o=>o.value===''))el.insertAdjacentHTML('afterbegin','<option value="">-- ยังไม่ระบุ --</option>');
   // Match original options regardless of a legacy numeric prefix; keep all other values verbatim.
   const key=v=>String(v).replace(/^\d+\s*[).]\s*/,'').trim();
   const known=Array.from(el.options).find(o=>o.value!=='OTHER'&&key(o.value)===key(text));
-  if(known)el.value=known.value;
+  if(known){
+   el.value=known.value;
+   const wrap=document.getElementById(detailedOtherBase(prefix,suffix)+'-other-wrap');
+   if(wrap)wrap.style.display='none';
+  }
   else if(text!==''&&Array.from(el.options).some(o=>o.value==='OTHER')){
    el.value='OTHER';const wrap=document.getElementById(detailedOtherBase(prefix,suffix)+'-other-wrap');
    if(wrap){wrap.style.display='block';const input=wrap.querySelector('input');if(input)input.value=text;}
@@ -3096,6 +3118,17 @@ function setDetailed2QStatus(prefix) {
  const out=document.getElementById(prefix+'-status-2q');if(out)out.value=screening2QResult(getDetailedField(prefix,'q2-1'),getDetailedField(prefix,'q2-2'));
 }
 function riskFromAssessmentScore(score){return score>=20?'มาก':score>=10?'ปานกลาง':'ต่ำ';}
+function updateAs01Answer(index) {
+ const select=document.getElementById('as01-answer-'+index);
+ const checkbox=document.getElementById('env-q'+index);
+ if(!select||!checkbox)return;
+ checkbox.checked=select.value==='1';
+ checkbox.indeterminate=select.value!==''&&select.value!=='0'&&select.value!=='1';
+ state.detailedScreening?.changedAnswers.add(index);
+ const complete=Array.from({length:11},(_,i)=>document.getElementById('as01-answer-'+(i+1))?.value).every(v=>v==='0'||v==='1');
+ const marker=document.getElementById('as01-assessment-complete');if(marker)marker.checked=complete;
+ recalcScore();
+}
 const recalcOriginalScreeningScore = recalcScore;
 recalcScore = function() {
  const context=state.detailedScreening;
@@ -3104,15 +3137,51 @@ recalcScore = function() {
  const complete=document.getElementById('as01-assessment-complete')?.checked;
  const note=document.getElementById('as01-source-score-note');
  if(note)note.textContent=complete?'คะแนนคำนวณจากคำตอบทั้ง 11 ข้อตามค่าน้ำหนักในแบบฟอร์ม':
-  historyValuePresent(context.record.total_score)?`คะแนนเดิมตามต้นฉบับ ${context.record.total_score} (${context.record.risk_level||'ไม่ระบุ'}) จะคงไว้จนกว่าจะยืนยันการประเมินครบ 11 ข้อ`:
-  'ติ๊กข้อที่ตอบใช่ แล้วกดยืนยันประเมินครบ 11 ข้อ เพื่อบันทึกคะแนนและระดับความเสี่ยง';
+  historyValuePresent(context.record.total_score)&&!context.changedAnswers.size?`คะแนนเดิมตามต้นฉบับ ${context.record.total_score} (${context.record.risk_level||'ไม่ระบุ'}) ยังคงเดิม`:
+  'เมื่อยังมีคำตอบไม่ทราบหรือยังไม่ตอบ ระบบจะรอข้อมูลครบก่อนสรุประดับความเสี่ยง';
  if(!complete){
-  const badge=document.getElementById('calc-risk-badge');if(badge){badge.className='risk-badge';badge.textContent='รอยืนยันประเมินครบ 11 ข้อ';}
-  setText('calc-measure-text','คะแนนด้านซ้ายเป็นผลรวมคำตอบที่ติ๊กในขณะนี้');
+  setText('calc-total-score','—');
+  const badge=document.getElementById('calc-risk-badge');if(badge){badge.className='risk-badge';badge.textContent='รอคำตอบครบ 11 ข้อ';}
+  setText('calc-measure-text','รอคำตอบครบทั้ง 11 ข้อก่อนสรุปคะแนนและระดับความเสี่ยง');
   for(const key of ['low','med','high'])document.getElementById('criteria-row-'+key)?.classList.remove('risk-criteria-row-active');
  }
  return score;
 };
+// แสดงช่องอื่น ๆ เมื่อเลือกและบังคับระบุรายละเอียด
+function updateAS01TargetOther(focusInput=false) {
+ const select=document.getElementById('resp-target-group');
+ const wrap=document.getElementById('resp-target-other-wrap');
+ const input=document.getElementById('resp-target-other');
+ if(!select||!wrap||!input)return;
+ const other=select.value==='OTHER';
+ wrap.style.display=other?'block':'none';input.required=other;
+ input.setCustomValidity(other && input.value && !input.value.trim()?'กรุณาระบุกลุ่มเป้าหมายอื่น ๆ':'');
+ if(other&&focusInput)input.focus();
+}
+// พิกัดแสดงช่องเดียว โดยยังเก็บข้อมูลแยก latitude/longitude ตามโครงสร้างเดิม
+function updateAS01WaterCoordinates(kind) {
+ const input=document.getElementById('resp-water-'+kind+'-coords');
+ const lat=document.getElementById('resp-water-'+kind+'-lat');
+ const lng=document.getElementById('resp-water-'+kind+'-lng');
+ if(!input||!lat||!lng)return false;
+ const raw=input.value.trim();
+ if(!raw){lat.value='';lng.value='';input.setCustomValidity('');return true;}
+ const match=raw.match(/^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(?:,|\s)\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$/);
+ if(!match||Math.abs(Number(match[1]))>90||Math.abs(Number(match[2]))>180){
+  input.setCustomValidity('กรุณากรอกพิกัดเป็น ละติจูด, ลองจิจูด เช่น 20.123456, 99.123456');return false;
+ }
+ input.setCustomValidity('');lat.value=match[1];lng.value=match[2];return true;
+}
+function restoreAS01WaterCoordinates(){
+ for(const kind of ['bore','shallow','mountain','other']){
+  const input=document.getElementById('resp-water-'+kind+'-coords');
+  const lat=document.getElementById('resp-water-'+kind+'-lat');
+  const lng=document.getElementById('resp-water-'+kind+'-lng');
+  if(!input||!lat||!lng)continue;
+  input.value=lat.value||lng.value?lat.value+', '+lng.value:'';
+  updateAS01WaterCoordinates(kind);
+ }
+}
 function setAS02FormNumberRequirement(isEditing) {
  const input=document.getElementById('as02-form-no');
  if(input){input.required=!isEditing;input.readOnly=false;input.disabled=false;}
@@ -3138,14 +3207,18 @@ function openRestoredScreeningForm(stage,id) {
  setDetailedField(prefix,'id',record.id);
  setDetailedField(prefix,'amphoe-prov',[record.amphoe,record.province].filter(Boolean).join(' / '));
  if(stage===1){
+  updateAS01TargetOther(false);
+  restoreAS01WaterCoordinates();
   document.getElementById('resp-no-cid').checked=Boolean(record.no_cid||record.cid==='ไม่มีเลข 13 หลัก');
   for(let i=1;i<=11;i++){
    const el=document.getElementById('env-q'+i),answer=record['q'+i];
    el.checked=Number(answer)===1;el.indeterminate=!historyValuePresent(answer);
+   const select=document.getElementById('as01-answer-'+i);
+   if(select)select.value=answer===1||answer==='1'||answer===true?'1':answer===0||answer==='0'||answer===false?'0':answer==='ไม่ทราบ'?'ไม่ทราบ':'';
    el.onchange=()=>{el.indeterminate=false;state.detailedScreening.changedAnswers.add(i);recalcScore();};
   }
   document.getElementById('as01-assessment-complete').checked=Array.from({length:11},(_,i)=>record['q'+(i+1)]).every(v=>historyValuePresent(v)&&[0,1].includes(Number(v)));
-  for(const [cls,key] of [['as01-occ-chk','risk_job_type'],['as01-dis-chk','diseases'],['as01-sym-chk','symptoms']])populateCheckboxesFromString(cls,record[key]);
+  for(const [cls,key] of [['as01-occ-chk','risk_job_type'],['as01-dis-chk','diseases'],['as01-sym-chk','symptoms'],['as01-water-chk','water_source_types']])populateCheckboxesFromString(cls,record[key]);
   recalcScore();
  }else{
   setAS02FormNumberRequirement(Boolean(existing));
@@ -3161,6 +3234,10 @@ function collectRestoredScreeningRecord(stage) {
  for(const [key,suffix] of Object.entries(detailedFields(stage))){
   const value=getDetailedField(prefix,suffix);if(value===undefined)continue;
   record[key]=DETAILED_NUMERIC_FIELDS.has(key)?optionalNumber(value):value;
+  if(stage===1&&key==='target_group'&&context.existing&&!context.targetGroupChanged){
+   const previous=context.record.target_group;
+   if((previous==='กลุ่มเดิม 68'&&value==='กลุ่มเดิม')||(['ประชาชนทั่วไป (แท็บประเมินแม่อาย 2569)','ประชาชนทั่วไป (แท็บการตอบกลับ)'].includes(previous)&&value==='ประชาชนทั่วไป'))record[key]=previous;
+  }
  }
  const area=getDetailedField(prefix,'amphoe-prov')??'';
  const parts=area.split('/').map(s=>s.trim());record.amphoe=parts[0];
@@ -3177,11 +3254,19 @@ function collectRestoredScreeningRecord(stage) {
  if(stage===1){
   record.no_cid=document.getElementById('resp-no-cid').checked;
   if(record.no_cid)record.cid='ไม่มีเลข 13 หลัก';
-  if(document.getElementById('as01-assessment-complete').checked){
-   record.total_score=0;
-   for(let i=1;i<=11;i++){record['q'+i]=document.getElementById('env-q'+i).checked?1:0;record.total_score+=record['q'+i]*ENV_WEIGHTS['q'+i];}
-   record.risk_level=riskFromAssessmentScore(record.total_score);record.assessment_complete=true;record.assessment_scoring_basis='Env-As-01_22.05.69(แม่อาย)';
-  }else if(!context.existing){record.total_score=null;record.risk_level='ไม่ระบุ';record.assessment_complete=false;}
+  const hasChanged=context.changedAnswers.size>0;
+  if(hasChanged||!context.existing){
+   for(let i=1;i<=11;i++){
+    const value=document.getElementById('as01-answer-'+i)?.value??'';
+    record['q'+i]=value==='1'?1:value==='0'?0:value==='ไม่ทราบ'?'ไม่ทราบ':'';
+   }
+  }
+  const complete=Array.from({length:11},(_,i)=>record['q'+(i+1)]).every(v=>v===0||v===1||v==='0'||v==='1'||v===true||v===false);
+  if(complete&&(hasChanged||!context.existing||!historyValuePresent(record.total_score))){
+   record.total_score=Array.from({length:11},(_,i)=>Number(record['q'+(i+1)])*ENV_WEIGHTS['q'+(i+1)]).reduce((a,b)=>a+b,0);
+   record.risk_level=riskFromAssessmentScore(record.total_score);record.assessment_scoring_basis='Env-As-01_22.05.69(แม่อาย)';
+  }else if(!complete&&(hasChanged||!context.existing)){record.total_score=null;record.risk_level='ไม่ระบุ';}
+  record.assessment_complete=complete;
  }else{
   for(const kind of ['drink','use']){const history=collectAS02WaterSources(kind);record[kind+'_source_years']=history.years;record[kind+'_sources_other']=history.extra;record[kind+'_sources']=formatWaterSources(record,kind);}
   record.history_updated=true;record.history_complete=Boolean(record.interview_date&&record.interviewer_name);
@@ -3201,9 +3286,6 @@ async function saveRestoredScreeningForm(e,stage) {
  e.preventDefault();
  if(stage===1&&!getDetailedField('resp','code')){alert('กรุณาระบุเลขที่แบบคัดกรอง / รหัส (Code)');return;}
  if(stage===2&&!state.detailedScreening.existing&&!getDetailedField('as02','form-no')){alert('กรุณาระบุเลขที่แบบฟอร์มสำหรับรายการใหม่');return;}
- if(stage===1&&state.detailedScreening.changedAnswers.size&&!document.getElementById('as01-assessment-complete').checked){
-  alert('กรุณายืนยันว่าประเมินครบทั้ง 11 ข้อแล้ว ก่อนบันทึกคำตอบและคำนวณคะแนนใหม่');return;
- }
  const record=collectRestoredScreeningRecord(stage);if(!record.full_name){alert('กรุณาระบุชื่อ–นามสกุล');return;}
  if(stage===1&&(historyValuePresent(record.latitude)!==historyValuePresent(record.longitude))){alert('กรุณาระบุพิกัดให้ครบทั้งละติจูดและลองจิจูด หรือเว้นว่างทั้งสองช่องหากยังไม่ทราบ');return;}
  const rows=stage===2?state.envAs02:state.respondents,index=rows.findIndex(r=>r.id===record.id);
@@ -3221,3 +3303,4 @@ function autofillAs02FromRespondent(id) {
  restoreAS02WaterSources(source);
  // The current AS-02 interview keeps its own 2Q answers and interview date.
 }
+

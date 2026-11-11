@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="styles.css?v=delete-risk-guidance-20261031" />
+  <link rel="stylesheet" href="styles.css?v=as01-release-20261111" />
 </head>
 <body>
 
@@ -1138,11 +1138,11 @@
           <!-- Template 3: Env-As-01 Respondents -->
           <div class="cloud-box">
             <h3><i class="fa-solid fa-file-medical"></i> 3. นำเข้าแบบคัดกรอง Env-As-01</h3>
-            <p style="font-size:12px; color:#64748b; margin:6px 0 10px;">นำเข้าผู้รับการคัดกรองพร้อมคำตอบข้อ 1-11 คำนวณคะแนนและระดับความเสี่ยงอัตโนมัติ</p>
+            <p style="font-size:12px; color:#64748b; margin:6px 0 10px;">นำเข้าข้อมูลตามเทมเพลต CSV โดยคัดลอกคำตอบจาก Google Sheets ลงคอลัมน์ที่ตรงกัน ระบบคิดคะแนนเมื่อมีคำตอบครบ 11 ข้อ</p><p class="data-note">แบบคัดกรอง อสม. ใหม่ใช้ปุ่มโหลด CSV ด้านล่าง ซึ่งมีช่องสถานะการสัมผัสและแหล่งน้ำเพิ่มเติม</p>
             <button class="btn btn-outline btn-block btn-sm" onclick="downloadTemplateCsv('as01')">
-              <i class="fa-solid fa-download"></i> โหลดตัวอย่าง Env-As-01 (.CSV)
+              <i class="fa-solid fa-download"></i> ดาวน์โหลดเทมเพลต Env-As-01 เปล่า (.CSV)
             </button>
-            <a class="btn btn-outline btn-block btn-sm" style="margin-top:6px" href="templates/MaeAi_import_templates.xlsx" download>Excel พร้อมคำอธิบายคอลัมน์</a><a class="template-help" href="templates/column-guide.html#as01" target="_blank" rel="noopener">ความหมายและตัวอย่างทุกคอลัมน์</a>
+            <a class="btn btn-outline btn-block btn-sm" style="margin-top:6px" href="templates/MaeAi_import_templates.xlsx" download>Excel รุ่นเดิมสำหรับข้อมูลพื้นฐาน</a><a class="template-help" href="templates/column-guide.html#as01" target="_blank" rel="noopener">ความหมายและตัวอย่างทุกคอลัมน์</a>
             <div style="margin-top:12px;">
               <label style="font-weight:600; font-size:12px;">เลือกไฟล์ CSV แบบ Env-As-01:</label>
               <input type="file" id="import-file-as01" accept=".csv" style="margin-top:4px; width:100%;" />
@@ -1493,15 +1493,15 @@
               </div>
               <div class="form-group">
                 <label>กลุ่มเป้าหมาย / แท็บข้อมูล *</label>
-                <select id="resp-target-group" onchange="toggleOtherInput(this, 'resp-target-other-wrap')">
-                  <option value="กลุ่มใหม่">กลุ่มใหม่ (เก็บปัสสาวะ)</option>
-                  <option value="ผู้ประกอบอาชีพ">ผู้ประกอบอาชีพ (เก็บปัสสาวะ)</option>
-                  <option value="กลุ่มเดิม 68">กลุ่มเดิม 68 (เก็บปัสสาวะ)</option>
-                  <option value="ประชาชนทั่วไป (แท็บประเมินแม่อาย 2569)">ประชาชนทั่วไป (แท็บประเมินแม่อาย 2569)</option>
-                  <option value="OTHER">อื่นๆ (โปรดระบุ...)</option>
+                <select id="resp-target-group" required onchange="updateAS01TargetOther(true);if(state.detailedScreening)state.detailedScreening.targetGroupChanged=true">
+                  <option value="กลุ่มใหม่">กลุ่มใหม่</option>
+                  <option value="ผู้ประกอบอาชีพ">ผู้ประกอบอาชีพ</option>
+                  <option value="กลุ่มเดิม">กลุ่มเดิม</option>
+                  <option value="ประชาชนทั่วไป">ประชาชนทั่วไป</option>
+                  <option value="OTHER">อื่น ๆ โปรดระบุ</option>
                 </select>
                 <div id="resp-target-other-wrap" class="other-input-wrap" style="display:none;">
-                  <input type="text" id="resp-target-other" placeholder="ระบุกลุ่มเป้าหมายอื่นๆ..." />
+                  <label for="resp-target-other">โปรดระบุกลุ่มเป้าหมายอื่น ๆ *</label><input type="text" id="resp-target-other" placeholder="ระบุกลุ่มเป้าหมายอื่น ๆ" oninput="updateAS01TargetOther(false)" />
                 </div>
               </div>
               <div class="form-group">
@@ -1520,10 +1520,10 @@
               <div class="form-group">
                 <label>รพ.สต. ที่รับผิดชอบ</label>
                 <select id="resp-hc" onchange="toggleOtherInput(this, 'resp-hc-other-wrap')">
-                  <option value="รพ.สต.บ้านท่าตอน">รพ.สต.บ้านท่าตอน</option>
-                  <option value="รพ.สต.บ้านท่ามะแกง">รพ.สต.บ้านท่ามะแกง</option>
+                  <option value="รพ.สต.บ้านท่าตอน">รพ.สต.ท่าตอน</option>
+                  <option value="รพ.สต.บ้านท่ามะแกง">รพ.สต.ท่ามะแกง</option>
                   <option value="รพ.สต.บ้านเมืองงาม">รพ.สต.บ้านเมืองงาม</option>
-                  <option value="รพ.สต.บ้านแม่เมืองน้อย">รพ.สต.บ้านแม่เมืองน้อย</option>
+                  <option value="รพ.สต.บ้านแม่เมืองน้อย">รพ.สต.แม่เมืองน้อย</option>
                   <option value="OTHER">อื่นๆ (โปรดระบุ...)</option>
                 </select>
                 <div id="resp-hc-other-wrap" class="other-input-wrap" style="display:none;">
@@ -1536,6 +1536,20 @@
               </div>
             </div>
           </div>
+
+          <div class="form-section-box" id="as01-exposure-water">
+ <h4>ประวัติการสัมผัสและแหล่งน้ำที่ใช้อุปโภคบริโภค</h4>
+ <div class="form-grid-2"><div class="form-group"><label for="resp-exposure-status">สถานะการสัมผัส</label>
+ <select id="resp-exposure-status"><option value="">ยังไม่ระบุ</option><option>ยังคงสัมผัสต่อเนื่อง 2 ปี</option><option>เคยสัมผัส 2 ปีก่อนแต่ต่อมาไม่สัมผัส</option><option>ไม่สัมผัส</option></select></div>
+ <div class="form-group"><label for="resp-water-source-name">ชื่อหรือรหัสแหล่งน้ำที่ทราบ</label><input id="resp-water-source-name" type="text" /></div></div>
+ <label>แหล่งน้ำที่ใช้อุปโภคและบริโภค เลือกได้หลายข้อ</label>
+ <input id="resp-water-source-types" type="hidden" />
+ <div class="form-grid-2"><div class="form-group"><label><input type="checkbox" class="as01-water-chk" value="บ่อบาดาล" onchange="syncAs01Checkboxes('as01-water-chk','resp-water-source-types')" /> บ่อบาดาล</label>
+ <div><label for="resp-water-bore-coords">พิกัด บ่อบาดาล (ละติจูด, ลองจิจูด)</label><input type="text" inputmode="decimal" id="resp-water-bore-coords" placeholder="เช่น 20.123456, 99.123456" oninput="updateAS01WaterCoordinates('bore')" aria-describedby="resp-coordinates-hint" /><input type="hidden" id="resp-water-bore-lat" /><input type="hidden" id="resp-water-bore-lng" /></div></div><div class="form-group"><label><input type="checkbox" class="as01-water-chk" value="บ่อน้ำตื้น" onchange="syncAs01Checkboxes('as01-water-chk','resp-water-source-types')" /> บ่อน้ำตื้น</label>
+ <div><label for="resp-water-shallow-coords">พิกัด บ่อน้ำตื้น (ละติจูด, ลองจิจูด)</label><input type="text" inputmode="decimal" id="resp-water-shallow-coords" placeholder="เช่น 20.123456, 99.123456" oninput="updateAS01WaterCoordinates('shallow')" aria-describedby="resp-coordinates-hint" /><input type="hidden" id="resp-water-shallow-lat" /><input type="hidden" id="resp-water-shallow-lng" /></div></div><div class="form-group"><label><input type="checkbox" class="as01-water-chk" value="ประปาภูเขา" onchange="syncAs01Checkboxes('as01-water-chk','resp-water-source-types')" /> ประปาภูเขา</label>
+ <div><label for="resp-water-mountain-coords">พิกัด ประปาภูเขา (ละติจูด, ลองจิจูด)</label><input type="text" inputmode="decimal" id="resp-water-mountain-coords" placeholder="เช่น 20.123456, 99.123456" oninput="updateAS01WaterCoordinates('mountain')" aria-describedby="resp-coordinates-hint" /><input type="hidden" id="resp-water-mountain-lat" /><input type="hidden" id="resp-water-mountain-lng" /></div></div><div class="form-group"><label><input type="checkbox" class="as01-water-chk" value="อื่น ๆ" onchange="syncAs01Checkboxes('as01-water-chk','resp-water-source-types')" /> อื่น ๆ</label>
+ <div><label for="resp-water-other-coords">พิกัด อื่น ๆ (ละติจูด, ลองจิจูด)</label><input type="text" inputmode="decimal" id="resp-water-other-coords" placeholder="เช่น 20.123456, 99.123456" oninput="updateAS01WaterCoordinates('other')" aria-describedby="resp-coordinates-hint" /><input type="hidden" id="resp-water-other-lat" /><input type="hidden" id="resp-water-other-lng" /></div></div></div><div class="form-group"><label for="resp-water-source-other">รายละเอียดแหล่งน้ำอื่น ๆ</label><input type="text" id="resp-water-source-other" /></div>
+ <small id="resp-coordinates-hint">กรอกเป็นคู่ ละติจูด, ลองจิจูด เช่น 20.123456, 99.123456 หรือเว้นว่างถ้ายังไม่ทราบ</small></div>
 
           <!-- ส่วนที่ 1: ข้อมูลทั่วไปส่วนบุคคล (ข้อ 1 - 7) -->
           <div class="form-section-box" id="as01-sec-1">
@@ -1808,25 +1822,23 @@
           <div class="form-section-box" id="as01-sec-4">
             <h4>ส่วนที่ 4: การประเมินความเสี่ยงการสัมผัสสารหนูจากสิ่งแวดล้อม (ข้อมูลภายในระยะเวลา 1 ปี - คะแนนเต็ม 30.5 คะแนน)</h4>
             <div class="env-questions-grid">
-              <label class="env-q-item"><input type="checkbox" id="env-q1" onchange="recalcScore()" /> <span><b>ข้อ 1 (ค่าน้ำหนัก A = 5):</b> ท่านดื่มน้ำหรือนำน้ำจากแม่น้ำที่ปนเปื้อนฯ มาประกอบอาหาร หรือไม่</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q2" onchange="recalcScore()" /> <span><b>ข้อ 2 (ค่าน้ำหนัก A = 5):</b> ท่านดื่มน้ำหรือนำน้ำจากบ่อน้ำตื้น/บ่อบาดาล ในบริเวณบ้านของท่านมาประกอบอาหาร หรือไม่</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q3" onchange="recalcScore()" /> <span><b>ข้อ 3 (ค่าน้ำหนัก A = 5):</b> ท่านใช้น้ำจากแม่น้ำที่ปนเปื้อนฯ โดยตรง มาอาบ หรือ ล้างหน้า แปรงฟัน หรือล้างผักผลไม้ หรือไม่</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q4" onchange="recalcScore()" /> <span><b>ข้อ 4 (ค่าน้ำหนัก A = 1.5):</b> ท่านเล่นหรือว่ายน้ำในแม่น้ำที่ปนเปื้อนฯ เป็นประจำ อย่างน้อยสัปดาห์ละ 1 ครั้ง</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q5" onchange="recalcScore()" /> <span><b>ข้อ 5 (ค่าน้ำหนัก A = 1.5):</b> ท่านทำงานที่มีโอกาสสัมผัสน้ำจากแม่น้ำที่ปนเปื้อนฯ เช่น ขับเรือโดยสาร ทำประมง แม่ค้า เป็นต้น หรือไม่</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q6" onchange="recalcScore()" /> <span><b>ข้อ 6 (ค่าน้ำหนัก A = 1):</b> ที่พักอาศัยของท่านอยู่ในรัศมี 1 กิโลเมตรจากแม่น้ำที่ปนเปื้อนฯ หรือไม่</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q7" onchange="recalcScore()" /> <span><b>ข้อ 7 (ค่าน้ำหนัก A = 1):</b> ท่านพักอาศัยอยู่ในพื้นที่มานานมากกว่า 5 ปี หรือไม่</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q8" onchange="recalcScore()" /> <span><b>ข้อ 8 (ค่าน้ำหนัก A = 4):</b> ท่านมีอาการที่เข้าได้กับพิษสารหนู ภายหลังจากท่านสัมผัสน้ำจากแม่น้ำที่ปนเปื้อนฯ หรือไม่</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q9" onchange="recalcScore()" /> <span><b>ข้อ 9 (ค่าน้ำหนัก A = 4):</b> ท่านหรือสมาชิกในครอบครัวมีอาการ และหรือ อาการแสดง ที่เข้าได้กับโรคสารหนู</span></label>
-              <label class="env-q-item"><input type="checkbox" id="env-q10" onchange="recalcScore()" /> <span><b>ข้อ 10 (ค่าน้ำหนัก A = 1):</b> เคยมีน้ำจากแม่น้ำที่ปนเปื้อนฯ หลากเข้าไปในบ้านหรือที่พักของท่านหรือไม่ ในระยะ 5 ปีที่ผ่านมา</span></label>
-              <label class="env-q-item" style="grid-column: span 2;"><input type="checkbox" id="env-q11" onchange="recalcScore()" /> <span><b>ข้อ 11 (ค่าน้ำหนัก A = 1.5):</b> โดยปกติท่านรับประทานพืช/ผักที่ปลูกในบริเวณแม่น้ำที่ปนเปื้อนฯ เป็นประจำ อย่างน้อยสัปดาห์ละ 1 ครั้งหรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q1" hidden /><select id="as01-answer-1" onchange="updateAs01Answer(1)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 1 (ค่าน้ำหนัก A = 5):</b> ท่านดื่มน้ำหรือนำน้ำจากแม่น้ำที่ปนเปื้อนฯ มาประกอบอาหาร หรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q2" hidden /><select id="as01-answer-2" onchange="updateAs01Answer(2)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 2 (ค่าน้ำหนัก A = 5):</b> ท่านดื่มน้ำหรือนำน้ำจากบ่อน้ำตื้น/บ่อบาดาล ในบริเวณบ้านของท่านมาประกอบอาหาร หรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q3" hidden /><select id="as01-answer-3" onchange="updateAs01Answer(3)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 3 (ค่าน้ำหนัก A = 5):</b> ท่านใช้น้ำจากแม่น้ำที่ปนเปื้อนฯ โดยตรง มาอาบ หรือ ล้างหน้า แปรงฟัน หรือล้างผักผลไม้ หรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q4" hidden /><select id="as01-answer-4" onchange="updateAs01Answer(4)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 4 (ค่าน้ำหนัก A = 1.5):</b> ท่านเล่นหรือว่ายน้ำในแม่น้ำที่ปนเปื้อนฯ เป็นประจำ อย่างน้อยสัปดาห์ละ 1 ครั้ง</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q5" hidden /><select id="as01-answer-5" onchange="updateAs01Answer(5)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 5 (ค่าน้ำหนัก A = 1.5):</b> ท่านทำงานที่มีโอกาสสัมผัสน้ำจากแม่น้ำที่ปนเปื้อนฯ เช่น ขับเรือโดยสาร ทำประมง แม่ค้า เป็นต้น หรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q6" hidden /><select id="as01-answer-6" onchange="updateAs01Answer(6)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 6 (ค่าน้ำหนัก A = 1):</b> ที่พักอาศัยของท่านอยู่ในรัศมี 1 กิโลเมตรจากแม่น้ำที่ปนเปื้อนฯ หรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q7" hidden /><select id="as01-answer-7" onchange="updateAs01Answer(7)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 7 (ค่าน้ำหนัก A = 1):</b> ท่านพักอาศัยอยู่ในพื้นที่มานานมากกว่า 5 ปี หรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q8" hidden /><select id="as01-answer-8" onchange="updateAs01Answer(8)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 8 (ค่าน้ำหนัก A = 4):</b> ท่านมีอาการที่เข้าได้กับพิษสารหนู ภายหลังจากท่านสัมผัสน้ำจากแม่น้ำที่ปนเปื้อนฯ หรือไม่</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q9" hidden /><select id="as01-answer-9" onchange="updateAs01Answer(9)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 9 (ค่าน้ำหนัก A = 4):</b> ท่านหรือสมาชิกในครอบครัวมีอาการ และหรือ อาการแสดง ที่เข้าได้กับโรคสารหนู</span></label>
+              <label class="env-q-item"><input type="checkbox" id="env-q10" hidden /><select id="as01-answer-10" onchange="updateAs01Answer(10)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 10 (ค่าน้ำหนัก A = 1):</b> เคยมีน้ำจากแม่น้ำที่ปนเปื้อนฯ หลากเข้าไปในบ้านหรือที่พักของท่านหรือไม่ ในระยะ 5 ปีที่ผ่านมา</span></label>
+              <label class="env-q-item env-q-item-wide"><input type="checkbox" id="env-q11" hidden /><select id="as01-answer-11" onchange="updateAs01Answer(11)"><option value="">ยังไม่ตอบ</option><option value="1">ใช่</option><option value="0">ไม่ใช่</option><option value="ไม่ทราบ">ไม่ทราบ</option></select> <span><b>ข้อ 11 (ค่าน้ำหนัก A = 1.5):</b> โดยปกติท่านรับประทานพืช/ผักที่ปลูกในบริเวณแม่น้ำที่ปนเปื้อนฯ เป็นประจำ อย่างน้อยสัปดาห์ละ 1 ครั้งหรือไม่</span></label>
             </div>
 
 
             <p class="data-note" id="as01-source-score-note"></p>
-            <label class="check-card" style="margin:10px 0;">
-              <input type="checkbox" id="as01-assessment-complete" onchange="recalcScore()" />
-              ยืนยันว่าประเมินครบทั้ง 11 ข้อแล้ว (ติ๊กข้อที่ตอบใช่ ข้อที่ไม่ติ๊กหมายถึงไม่ใช่)
-            </label>
+            <input type="checkbox" id="as01-assessment-complete" hidden />
+            <p class="data-note">เลือก ใช่ ไม่ใช่ หรือ ไม่ทราบ ให้ตรงกับคำตอบแต่ละข้อ</p>
             <div class="score-summary-banner">
               <div>
                 <span>สรุปคะแนนประเมินความเสี่ยง (เต็ม 30.5): </span>
@@ -1877,15 +1889,15 @@
               <div class="form-group">
                 <label>ข้อ 1. ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ ท่านรู้สึกหดหู่ เศร้า หรือท้อแท้สิ้นหวัง หรือไม่</label>
                 <select id="resp-q2-1" onchange="recalcModalAs01_2Q()">
-                  <option value="ไม่ใช่">ไม่ใช่ (ปกติ = 0)</option>
-                  <option value="ใช่">ใช่ (มีอาการ = 1)</option>
+                  <option value="ไม่ใช่">ไม่มี</option>
+                  <option value="ใช่">มี</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>ข้อ 2. ใน 2 สัปดาห์ที่ผ่านมา รวมวันนี้ ท่านรู้สึกเบื่อ ทำอะไรก็ไม่เพลิดเพลิน หรือไม่</label>
                 <select id="resp-q2-2" onchange="recalcModalAs01_2Q()">
-                  <option value="ไม่ใช่">ไม่ใช่ (ปกติ = 0)</option>
-                  <option value="ใช่">ใช่ (มีอาการ = 1)</option>
+                  <option value="ไม่ใช่">ไม่มี</option>
+                  <option value="ใช่">มี</option>
                 </select>
               </div>
               <div class="form-group">
@@ -2737,7 +2749,7 @@
   <script src="data.js?v=online-20261031"></script>
   <!-- Main Application Logic -->
   <script src="water-history.js?v=online-20261031"></script>
-  <script src="import-templates.js?v=online-20261031"></script>
-  <script src="app.js?v=delete-risk-guidance-20261031"></script>
+  <script src="import-templates.js?v=as01-release-20261111"></script>
+  <script src="app.js?v=as01-release-20261111"></script>
 </body>
 </html>

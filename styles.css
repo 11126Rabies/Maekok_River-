@@ -1508,3 +1508,7 @@ h1, h2, h3, h4, .nav-tab, .btn {
 .screening-delete-details dt {font-weight:700;}
 .screening-delete-details dd {margin:0;overflow-wrap:anywhere;}
 @media(max-width:520px){.screening-delete-details{grid-template-columns:1fr;gap:4px;}.screening-delete-details dd{margin-bottom:10px;}}
+
+.env-q-item {flex-direction:column;}
+.env-q-item select {order:2; min-width:140px; padding:6px; border:1px solid #94a3b8; border-radius:5px;}
+.env-q-item-wide {grid-column:1 / -1;}
